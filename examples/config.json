@@ -1,0 +1,12 @@
+{
+  "plannerProvider": "codex",
+  "reviewerProvider": "codex",
+  "workerProvider": "spawn",
+  "workerModel": { "provider": "local", "model": "REPLACE_WITH_YOUR_MODEL_ID" },
+  "workerToolAllow": ["bash"],
+  "maxStrongCalls": 2,
+  "maxFixRounds": 1,
+  "agentTimeoutMs": 1800000,
+  "commandTimeoutMs": 600000,
+  "verifyCommands": [["npm", "test"]]
+}

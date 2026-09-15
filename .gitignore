@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+build/
+*.egg-info/
+.harness-orchestrator/
+node_modules/
+*.tgz
+coverage/
+.DS_Store

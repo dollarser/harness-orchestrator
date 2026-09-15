@@ -1,0 +1,30 @@
+# Commands are argv arrays. {prompt} and {workspace} are substituted per invocation.
+# Keep these local to your own machine/profile. No shell is used.
+
+[agents.codex]
+command = ["codex", "exec", "--ephemeral", "--json", "--skip-git-repo-check", "-C", "{workspace}", "{prompt}"]
+result_mode = "codex-jsonl"
+timeout_seconds = 1800
+
+[agents.claude]
+command = ["claude", "-p", "{prompt}", "--output-format", "json", "--permission-mode", "auto"]
+result_mode = "claude-json"
+timeout_seconds = 1800
+
+[agents.dsh]
+command = ["dsh", "--profile", "headless", "{prompt}"]
+result_mode = "text"
+timeout_seconds = 1800
+
+[policy]
+planner = "codex"
+worker = "dsh"
+reviewer = "codex"
+fixer = "dsh"
+max_codex_calls = 2
+max_fix_rounds = 1
+require_clean_worktree = true
+reviewer_write = false
+verify_commands = []
+# Example:
+# verify_commands = [["python", "-m", "pytest", "-q"], ["ruff", "check", "."]]
