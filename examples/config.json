@@ -1,9 +1,3 @@
 {
-  "workerProvider": "spawn",
-  "workerModel": {
-    "provider": "local",
-    "model": "REPLACE_WITH_YOUR_MODEL_ID"
-  },
-  "workerToolAllow": [],
-  "agentTimeoutMs": 1800000
+  "profileDir": "/absolute/path/to/.dsh/profiles/web"
 }

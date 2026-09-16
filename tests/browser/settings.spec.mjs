@@ -1,125 +1,49 @@
 import { test, expect } from '@playwright/test';
-
-test('provider selection clears the previous model and saves the selected route', async ({ page }) => {
+test('shows distinct states and requires an explicit target preset', async ({ page }) => {
   await page.goto('/');
-  await page.getByLabel('模型 Provider', { exact: true }).selectOption('remote');
-  const model = page.getByLabel('模型', { exact: true });
-  await expect(model).toHaveValue('');
-  await expect(model.locator('option')).toHaveText(['请选择模型', 'Remote Coder (remote-model)']);
-  await model.selectOption('remote-model');
-  await page.getByRole('button', { name: '保存配置' }).click();
-  await page.reload();
-  await expect(page.getByLabel('模型 Provider', { exact: true })).toHaveValue('remote');
-  await expect(model).toHaveValue('remote-model');
+  await expect(page.getByText(/已安装 0.1.5-rc.1/)).toContainText('当前宿主：未注册');
+  await expect(page.getByRole('button', { name: '启用 Codex 工具', exact: true })).toBeDisabled();
+  await page.getByLabel('Agent 预设').selectOption('user');
+  await expect(page.getByRole('button', { name: '启用 Codex 工具', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: '启用 Claude Code 工具', exact: true })).toBeDisabled();
 });
-test('unknown saved route survives catalog refresh and unrelated edits', async ({ page }) => {
-  await page.goto('/?unknown');
-  await expect(page.getByText('当前模型配置未出现在目录中', { exact: false })).toBeVisible();
-  await page.getByRole('button', { name: '刷新模型列表' }).click();
-  await expect(page.getByLabel('模型 Provider', { exact: true })).toHaveValue('removed');
-  await expect(page.getByLabel('模型', { exact: true })).toHaveValue('old-model');
-  await page.getByLabel('任务超时（毫秒）').fill('3000');
-  await page.getByRole('button', { name: '保存配置' }).click();
-  await expect(page.getByRole('status').filter({ hasText: '已保存到 DSH' })).toHaveText('已保存到 DSH，从下一次任务生效。');
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('fixture')).value.workerModel))
-    .toEqual({ provider: 'removed', model: 'old-model' });
+test('enables tools, preserves selected preset and displays restart requirement', async ({ page }) => {
+  await page.goto('/'); await page.getByLabel('Agent 预设').selectOption('user');
+  await page.getByRole('button', { name: '启用 Codex 工具', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('重启 DSH');
+  await expect(page.getByLabel('Agent 预设')).toHaveValue('user');
+  await expect(page.getByRole('button', { name: '启用 Codex 工具', exact: true })).toBeDisabled();
 });
-test('catalog failure preserves configuration and can retry', async ({ page }) => {
-  await page.goto('/?catalog-failure');
-  await expect(page.getByRole('alert')).toContainText('模型列表读取失败');
-  await expect(page.getByLabel('模型', { exact: true })).toHaveValue('qwen3-coder');
-  await expect(page.getByRole('button', { name: '保存配置' })).toBeDisabled();
-  await page.getByRole('button', { name: '刷新模型列表' }).click();
-  await expect(page.getByLabel('模型 Provider', { exact: true })).toBeEnabled();
-  await expect(page.getByRole('alert')).toHaveCount(0);
+test('guidance persists across reload and can be switched off', async ({ page }) => {
+  await page.goto('/'); await page.getByLabel('Agent 预设').selectOption('user');
+  await page.getByLabel('注入分工指引').check();
+  await expect(page.getByLabel('注入分工指引')).toBeChecked();
+  await page.reload(); await page.getByLabel('Agent 预设').selectOption('user');
+  await expect(page.getByLabel('注入分工指引')).toBeChecked();
+  await page.getByLabel('注入分工指引').uncheck();
+  await expect(page.getByLabel('注入分工指引')).not.toBeChecked();
 });
-test('empty and partially failed catalogs provide recovery guidance', async ({ page }) => {
-  await page.goto('/?empty-catalog');
-  await expect(page.getByText('尚无模型 Provider', { exact: false })).toBeVisible();
-  await expect(page.getByLabel('模型', { exact: true })).toBeDisabled();
-  await page.goto('/?partial-catalog');
-  await expect(page.getByLabel('模型', { exact: true })).toBeEnabled();
-  await page.getByLabel('模型 Provider', { exact: true }).selectOption('remote');
-  await expect(page.getByRole('alert')).toContainText('此 Provider 的模型列表读取失败');
-  await expect(page.getByLabel('模型', { exact: true })).toBeDisabled();
+test('read-only presets cannot change tools or guidance', async ({ page }) => {
+  await page.goto('/'); await page.getByLabel('Agent 预设').selectOption('standard');
+  await expect(page.getByLabel('注入分工指引')).toBeDisabled();
+  await expect(page.getByRole('button', { name: '启用 Codex 工具', exact: true })).toBeDisabled();
 });
-
-test('save, reload, discard and restore defaults', async ({ page }) => {
-  const errors = []; page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/');
-  await page.getByLabel('模型', { exact: true }).selectOption('new-model');
-  await page.getByRole('button', { name: '保存配置' }).click();
-  await expect(page.getByRole('status')).toHaveText('已保存到 DSH，从下一次任务生效。');
-  await page.reload(); await expect(page.getByLabel('模型', { exact: true })).toHaveValue('new-model');
-  await page.getByLabel('模型', { exact: true }).selectOption('unsaved');
-  await page.getByRole('button', { name: '放弃修改' }).click();
-  await expect(page.getByLabel('模型', { exact: true })).toHaveValue('new-model');
-  await page.getByRole('button', { name: '恢复部署默认值' }).click();
-  await expect(page.getByLabel('模型', { exact: true })).toHaveValue('qwen3-coder');
-  expect(errors).toEqual([]);
+test('conflicts do not claim success or enable a switch', async ({ page }) => {
+  await page.goto('/?conflict'); await page.getByLabel('Agent 预设').selectOption('user');
+  await page.getByLabel('注入分工指引').click();
+  await expect(page.getByRole('alert')).toContainText('预设已更改');
+  await expect(page.getByLabel('注入分工指引')).not.toBeChecked();
 });
-test('autonomous page has no workflow gates and still requires an enabled model', async ({ page }) => {
-  await page.goto('/');
-  await expect(page.getByLabel('验证命令（JSON）')).toHaveCount(0);
-  await expect(page.getByLabel('强模型调用上限')).toHaveCount(0);
-  await expect(page.getByLabel('规划 Provider')).toHaveCount(0);
-  await page.getByLabel('模型', { exact: true }).selectOption('');
-  await page.getByRole('button', { name: '保存配置' }).click();
-  await expect(page.getByRole('alert')).toContainText('workerModel');
-  expect(await page.evaluate(() => window.fixture.writes())).toBe(0);
+test('connection errors are actionable and refresh remains available', async ({ page }) => {
+  await page.goto('/?failure'); await expect(page.getByRole('alert')).toContainText('宿主连接失败');
+  await expect(page.getByRole('button', { name: '刷新状态' })).toBeEnabled();
 });
-test('pushed revision preserves draft and refuses stale save until reload', async ({ page }) => {
-  await page.goto('/');
-  await page.getByLabel('模型', { exact: true }).selectOption('my-draft');
-  await page.evaluate(() => window.fixture.remoteChange());
-  await expect(page.getByRole('alert')).toContainText('其他页面');
-  await expect(page.getByLabel('模型', { exact: true })).toHaveValue('my-draft');
-  await expect(page.getByRole('button', { name: '保存配置' })).toBeDisabled();
-  await page.getByRole('button', { name: '载入最新配置' }).click();
-  await expect(page.getByLabel('任务超时（毫秒）')).toHaveValue('5000');
+test('unknown authentication does not appear as logged in', async ({ page }) => {
+  await page.goto('/'); await page.getByRole('button', { name: '检测 Codex 登录', exact: true }).click();
+  await expect(page.getByText(/未知。无法确认登录状态/)).toBeVisible();
 });
-for (const mode of ['refused', 'failure']) test(`${mode} save retains draft without a false success`, async ({ page }) => {
-  await page.goto(`/?${mode}`);
-  await page.getByLabel('模型', { exact: true }).selectOption('my-draft');
-  await page.getByRole('button', { name: '保存配置' }).click();
-  await expect(page.getByRole('alert')).toBeVisible();
-  await expect(page.getByLabel('模型', { exact: true })).toHaveValue('my-draft');
-  await expect(page.getByText('已保存到 DSH，从下一次任务生效。')).toHaveCount(0);
-});
-test('read-only and unavailable connections do not offer writes', async ({ page }) => {
-  await page.goto('/?readonly');
-  await expect(page.getByRole('button', { name: '保存配置' })).toBeDisabled();
-  await expect(page.getByLabel('模型', { exact: true })).toBeDisabled();
-  await page.goto('/?unavailable'); await expect(page.getByRole('status')).toContainText('无法读取');
-  await expect(page.getByRole('button', { name: '保存配置' })).toHaveCount(0);
-  await page.goto('/?loading'); await expect(page.getByRole('status')).toContainText('正在载入');
-});
-test('desktop and narrow dark layout remain readable without horizontal overflow', async ({ page }, testInfo) => {
-  await page.setViewportSize({ width: 1060, height: 1000 }); await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Smart Dev', exact: true })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('desktop.png'), fullPage: true });
-  await page.setViewportSize({ width: 390, height: 844 }); await page.emulateMedia({ colorScheme: 'dark' });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.getByRole('button', { name: '保存配置' }).scrollIntoViewIfNeeded();
-  await page.screenshot({ path: testInfo.outputPath('mobile-dark.png'), fullPage: true });
-});
-
-test('backend selector explains context and native model ownership', async ({ page }) => {
-  await page.goto('/');
-  const backend = page.getByLabel('执行 Backend', { exact: true });
-  await expect(backend.locator('option')).toHaveCount(4);
-  await backend.selectOption('fork');
-  await expect(page.getByText('从当前会话已完成的对话创建子 Agent', { exact: false })).toBeVisible();
-  await expect(page.getByLabel('模型', { exact: true })).toBeVisible();
-  await backend.selectOption('codex');
-  await expect(page.getByText('通过 DSH 的 Codex 后端执行任务', { exact: false })).toBeVisible();
-  await expect(page.getByLabel('模型', { exact: true })).toHaveCount(0);
-  await expect(page.getByLabel('工具范围（可选）', { exact: false })).toHaveCount(0);
-  await page.getByRole('button', { name: '保存配置' }).click();
-  await expect(page.getByRole('status')).toHaveText('已保存到 DSH，从下一次任务生效。');
-  await page.reload(); await expect(backend).toHaveValue('codex');
-  await backend.selectOption('claude-code');
-  await expect(page.getByText('通过 DSH 的 Claude Code 后端执行任务', { exact: false })).toBeVisible();
-  await backend.selectOption('spawn');
-  await expect(page.getByLabel('模型', { exact: true })).toHaveValue('qwen3-coder');
+test('mobile layout has no horizontal overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 }); await page.goto('/');
+  await page.getByLabel('Agent 预设').selectOption('user');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

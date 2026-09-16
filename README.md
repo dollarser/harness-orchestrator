@@ -1,67 +1,72 @@
-# harness-orchestrator
+# Smart Dev · DSH 多 Agent 接入助手
 
-**DeepSeek Harness 原生任务插件**：输入 `/smart-dev <task>`，由执行 Agent 自主决定如何完成任务。
+Smart Dev 为 DeepSeek Harness 接通 Codex、Claude Code：检测后端状态、安装依赖、启用选定 Agent 预设的原生工具，并按需注入分工指引。
 
-```text
-用户任务 → DSH 执行 Agent → 工作结果与运行记录
-              自主选择规划、检查、修复和审查
-```
+**在普通 DSH 对话中提出任务，由主 Agent 自主决定直接完成或委派。** 本插件不接管任务，不提供 `/smart-dev` 命令，不规定规划、检查、修复或审查流程。
 
-从 0.4.0 起，不再用代码强制规划、执行、验证、审查的顺序，也不要求预先填写验证命令或限制修复轮次。Agent 根据任务、项目说明和实际结果决策；插件负责运行保障。
+## 能力
 
-## 当前实现
+- 配置页分别显示包安装、Profile Bundle、当前后端注册、预设工具配置及运行中 Agent 的工具可见性。
+- 选择用户 Agent 预设，一键安装并启用 Codex / Claude Code；不改其他预设、模型或权限配置。
+- 检测 CLI 登录状态，只返回概括结果；交互登录由用户在终端完成。
+- 非强制分工指引通过独立 system prompt section 注入，保留原有 persona。可随时关闭，插件卸载后停止注入。
+- 修改预设前保存可还原记录；有外部编辑时拒绝自动覆盖。安装前备份 Profile 清单与锁文件。
 
-- 原生 **Settings → Smart Dev**：选择 Backend、模型、可选工具范围、超时和启用开关。
-- Backend 下拉提供 spawn、fork、Codex、Claude Code 及用途说明；外部后端需安装，使用自己的模型与权限。一次 `/smart-dev` 任务交给一个选定后端。
-- 检查由 Agent 通过 DSH 工具自主执行；结果报告说明改动、实际检查、未完成事项和不确定性。
-- 工作区锁、父会话 maintenance、取消、超时、子 Agent 清理及仓库外运行记录。
-- 普通目录、空目录和仓库子目录都可执行；Git 可用时记录差异，无 Git 时不强制初始化。
-- `FINISHED` 表示 Agent 正常返回，**不是插件独立验收通过**。
-- 有离线运行、真实 Git/进程、Cordis 生命周期和页面交互测试；尚未完成真实模型编码任务验收。
+## 使用
 
-DSH 仍是运行宿主。旧固定流程被 [ADR-002](docs/decisions/002-agent-owned-execution.md) 替代，原 Python CLI 留在 [legacy/python](legacy/python/README.md)。
+打开 **DSH 设置 → Smart Dev**：
 
-## 开发
+1. 选择要接入的用户 Agent 预设。系统预设先在 DSH 中复制。
+2. 点击“安装并启用”，或为已安装后端点击“启用工具”。
+3. 按提示重启 DSH，打开对应预设会话，再刷新检查实际工具可见性。
+4. 检测登录，根据页面命令完成 CLI 登录。
+5. 可选开启“注入分工指引”。在普通对话中发起任务。
 
-Node.js 22+、macOS/Linux、Git；DSH 自身要求以使用版本为准。
+例如：
 
-```bash
+> 帮我实现登录功能。你可以让 Codex 分析方案，自己或 Claude Code 实现；按实际需要决定如何检查。
+
+指引只建议可能的分工，主 Agent 可直接执行，也可以采用其他组合。工具可见或已登录不代表模型调用已经验证成功。
+
+## 安装插件
+
+```sh
 npm ci
 npm run check
 npm run test:ui
+npm pack
+# 在 DSH 源码目录运行，tarball 使用绝对路径：
+pnpm dsh plugin --profile web add /absolute/path/dollarser-dsh-smart-dev-0.6.0.tgz
 ```
 
-开发类型固定为 DSH `0.1.5-rc.1`、Cordis `4.0.2`，使用宿主服务，不捆绑第二套 DSH 运行时。见 [验证记录](docs/validation.md)。
+该包提供 Host 插件与 Web 配置页。需要在 Profile 的 `cordis.patch.yml` 中添加 Host 入口：
 
-## 接入 DSH
-
-1. 在 DSH 中配置模型并选择目标目录或用于新建项目的父目录。
-2. 构建本项目，生成 overlay：`node scripts/create-overlay.mjs --configure /绝对路径/smart-dev.patch.yml`。
-3. 在 DSH 源码目录运行 `pnpm dsh web --patch /绝对路径/smart-dev.patch.yml`。
-4. 在 **Settings → Smart Dev** 选择模型、启用并保存。
-5. 输入 `/smart-dev <task>`。
-
-详见 [使用指南](docs/usage.md)、[配置页](docs/configuration-page.md) 和 [配置样例](examples/config.json)。
-
-## 代码结构
-
-```text
-src/core/       任务提示与运行生命周期，不依赖 DSH
-src/dsh/        命令、设置、子 Agent 适配与清理
-src/client/     原生设置页与模型选择
-src/shared/     配置类型与校验
-src/host/       工作区锁、Git 快照、原子文件和进程管理
-tests/         运行保障、宿主集成与页面测试
-docs/          当前设计、使用说明、决策和验证边界
-legacy/python/ 原外部编排原型
+```yaml
+- insert:
+    - id: smart-dev
+      name: '/absolute/path/to/profile/node_modules/@dollarser/dsh-smart-dev/dist/dsh/plugin.js'
+      config: {}
 ```
 
-## 边界
+安装在 Profile 内时自动定位 Profile；源码直接加载时必须配置 `profileDir`。之后重启 `pnpm dsh web --no-open`。
 
-Agent 决策质量取决于模型、上下文和工具。插件没有强制验收门槛、费用预算或独立 Reviewer；不能把正常返回等同于任务已经完成。
+也可用 `node scripts/create-overlay.mjs examples/config.json /tmp/smart-dev.patch.yml` 生成一次性 overlay。示例中的 Profile 路径需要自行替换。
 
-权限和嵌套委派由 DSH 管理；可选工具过滤只收窄可用工具，允许 shell 不构成文件系统或费用沙箱。锁只协调共享状态目录的本插件任务，不能阻止其他编辑器写入。
+## 文档
 
-当前不要求 Git；不提供自动续跑、自动 worktree 创建、完整嵌套 trace/费用汇总或自动回滚。详见 [架构](docs/architecture.md)。
+- [使用、登录与卸载](docs/usage.md)
+- [配置页与状态解释](docs/configuration-page.md)
+- [架构与边界](docs/architecture.md)
+- [验证记录](docs/validation.md)
+- [设计决定：接入助手](docs/decisions/003-multi-agent-setup.md)
 
-主 DSH Agent 调用外部后端，需要安装后端并在实际 Agent 预设启用委派工具。可使用[分工指引](examples/delegation-guidance.md)，由模型自行决定是否请 Codex 规划、自己或 Claude Code 实现；见[配置步骤](docs/usage.md#主-dsh-agent-自主调度多个后端)。
+## 开发
+
+```sh
+npm ci
+npm run check
+npm run test:ui
+npm pack --dry-run
+```
+
+0.6.0 不兼容旧的任务执行配置。0.5 及更早版本的编排实现可在 Git 历史中查阅。旧任务记录不读取、不删除。

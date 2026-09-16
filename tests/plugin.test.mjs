@@ -1,0 +1,34 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { Context } from '@deepseek-ai/cordis';
+import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import * as plugin from '../dist/dsh/plugin.js';
+
+test('Cordis lifecycle: scoped guidance, live preset selection, exact RPC ownership and disposal', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'smart-dev-plugin-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await writeFile(join(root, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: [] } } }));
+  await mkdir(join(root, '.smart-dev'));
+  await writeFile(join(root, '.smart-dev/preferences.json'), JSON.stringify({ guidancePresets: ['chosen'] }));
+  const ctx = new Context(); let section, rpc;
+  ctx.provide('connection', { fetch: { register(route) { assert.equal(route.path, '/api/smart-dev/manage'); rpc = route.fetch; return async () => { rpc = undefined; }; } } });
+  const invoke = async payload => (await (await rpc(new Request('http://localhost/api/smart-dev/manage', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'client-request', rpcId: 'test', method: 'smart-dev/manage', payload }) }))).json()).result;
+  ctx.provide('systemPrompt', { section(value) { section = value; return () => { section = undefined; }; } });
+  ctx.provide('agentPresets', { list: async () => [] });
+  ctx.provide('subagents', { list: () => ['codex'] });
+  ctx.provide('agents', { list: () => [] });
+  ctx.provide('tools', { get: () => undefined });
+  ctx.provide('sessionProjections', { stateOf: session => session.currentPreset });
+  const fiber = await ctx.plugin(plugin, { profileDir: root });
+  assert.equal(section.name, 'smart-dev:delegation'); assert.equal(section.text({}), '');
+  const agent = { session: { currentPreset: 'chosen', header: { agentPreset: 'old' } } };
+  assert.match(section.text({ agent }), /not a required pipeline/);
+  agent.session.currentPreset = 'other'; assert.equal(section.text({ agent }), '');
+  assert.equal((await rpc(new Request('http://localhost/api/smart-dev/manage', { method: 'POST' }))).status, 415);
+  const result = await invoke({ action: 'status' }); assert.equal(result.ok, true);
+  assert.equal(result.value.status.backends[0].registered, true);
+  const invalid = await invoke({ action: 'arbitrary-command' }); assert.equal(invalid.ok, false);
+  await fiber.dispose(); assert.equal(section, undefined); assert.equal(rpc, undefined);
+});

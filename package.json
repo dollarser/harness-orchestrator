@@ -1,7 +1,7 @@
 {
   "name": "@dollarser/dsh-smart-dev",
-  "version": "0.5.0",
-  "description": "Agent-owned coding tasks with runtime safeguards as a DeepSeek Harness plugin",
+  "version": "0.6.0",
+  "description": "Native DSH multi-agent setup, diagnostics and optional delegation guidance",
   "type": "module",
   "license": "MIT",
   "repository": "github:dollarser/harness-orchestrator",
@@ -24,14 +24,9 @@
     "dist",
     "README.md",
     "LICENSE",
+    "docs",
     "examples",
-    "docs/usage.md",
-    "docs/architecture.md",
-    "docs/validation.md",
-    "docs/decisions",
-    "legacy/python/README.md",
-    "scripts/create-overlay.mjs",
-    "docs/configuration-page.md"
+    "scripts/create-overlay.mjs"
   ],
   "scripts": {
     "build": "node scripts/clean-build.mjs && tsc -p tsconfig.json && node scripts/build-client.mjs",
@@ -43,18 +38,17 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
     "@deepseek-ai/dsh-agent": "0.1.5-rc.1",
-    "@deepseek-ai/dsh-api-gateway": "0.1.5-rc.1",
-    "@deepseek-ai/dsh-api-remotes": "0.1.5-rc.1",
-    "@deepseek-ai/dsh-api-session-controller": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-agent-presets": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-client-connection": "0.1.5-rc.1",
     "@deepseek-ai/dsh-client-ui-renderer": "0.1.5-rc.1",
     "@deepseek-ai/dsh-client-ui-settings": "0.1.5-rc.1",
     "@deepseek-ai/dsh-client-ui-slots": "0.1.5-rc.1",
-    "@deepseek-ai/dsh-commands": "0.1.5-rc.1",
     "@deepseek-ai/dsh-llm": "0.1.5-rc.1",
     "@deepseek-ai/dsh-session": "0.1.5-rc.1",
-    "@deepseek-ai/dsh-settings": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-session-projection": "0.1.5-rc.1",
     "@deepseek-ai/dsh-subagent": "0.1.5-rc.1",
-    "@deepseek-ai/dsh-typert-protocol": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-system-prompt": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-tools": "0.1.5-rc.1",
     "@playwright/test": "1.55.0",
     "@types/node": "^22.0.0",
     "@types/react": "18.3.1",
@@ -69,11 +63,11 @@
       "platform": "web",
       "inject": [
         "@deepseek-ai/dsh-client-ui-settings",
-        "@deepseek-ai/dsh-api-remotes"
+        "@deepseek-ai/dsh-client-connection"
       ]
     }
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "3.18.2"
+    "yaml": "^2.8.1"
   }
 }
