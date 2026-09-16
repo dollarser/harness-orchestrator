@@ -34,7 +34,7 @@ async function fixture(t, command) {
   await writeFile(join(profile, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: [] } } }));
   const file = join(profile, 'agent.cordis.yml'); await writeFile(file, source);
   const presets = [{ id: 'user', path: file, trust: 'user' }, { id: 'standard', path: file, trust: 'system' }];
-  const host = { presets: async () => presets, registered: () => [], agents: () => [] };
+  const host = { copyPreset: async (from, id, name) => { const original = presets.find(p => p.id === from); const path = join(profile, `${id}.yml`); await writeFile(path, await readFile(original.path)); presets.push({ id, name, path, trust: 'user' }); }, presets: async () => presets, registered: () => [], agents: () => [] };
   const manager = new Manager(profile, host, command); await manager.init();
   async function installFake(id = 'codex') {
     const item = backends.find(b => b.id === id);
@@ -139,4 +139,32 @@ test('one-click setup installs and enables only the selected preset', async t =>
   const result = await f.manager.dispatch({ action: 'install', backend: 'claude-code', preset: 'user', revision: await f.revision() });
   assert.match(result.message, /重启/);
   assert.deepEqual(enabledBackends(await readFile(f.file, 'utf8')), ['claude-code']);
+});
+test('built-in collaboration copies once, enables both tools and guidance, leaves original intact', async t => {
+  const f = await fixture(t); await f.installFake(); await f.installFake('claude-code');
+  const request = { action: 'collaborate', preset: 'standard', revision: await f.revision() };
+  const reply = await f.manager.dispatch(request);
+  assert.equal(reply.selectedPreset, 'smart-dev-standard');
+  assert.deepEqual(reply.status.presets.find(p => p.id === reply.selectedPreset).enabled.sort(), ['claude-code','codex']);
+  assert.ok(f.manager.preferences.guidancePresets.includes(reply.selectedPreset));
+  assert.equal(await readFile(f.file, 'utf8'), source);
+  await f.manager.dispatch(request);
+  assert.equal(f.presets.filter(p => p.id === reply.selectedPreset).length, 1);
+});
+test('collaboration rejects an unowned name collision without overwriting', async t => {
+  const f = await fixture(t);
+  f.presets.push({ id: 'smart-dev-standard', path: f.file, trust: 'user' });
+  await assert.rejects(f.manager.dispatch({ action:'collaborate', preset:'standard', revision:await f.revision() }), /不由 Smart Dev 管理/);
+  assert.equal(await readFile(f.file, 'utf8'), source);
+});
+test('failed setup keeps the copy and retries it instead of creating duplicates', async t => {
+  let fail = true, f;
+  f = await fixture(t, async (_file,args) => { if (fail) throw new Error('failure'); await f.installFake(args.at(-1).includes('claude-code') ? 'claude-code' : 'codex'); return ''; });
+  const request = { action:'collaborate', preset:'standard', revision:await f.revision() };
+  await assert.rejects(f.manager.dispatch(request), /已保留/);
+  assert.equal(f.presets.filter(p => p.id === 'smart-dev-standard').length, 1);
+  fail = false;
+  const reply = await f.manager.dispatch(request);
+  assert.equal(reply.selectedPreset, 'smart-dev-standard');
+  assert.equal(f.presets.filter(p => p.id === 'smart-dev-standard').length, 1);
 });

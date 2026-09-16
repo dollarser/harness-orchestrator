@@ -16,6 +16,7 @@ export async function apply(ctx: Context, raw: { profileDir?: string } = {}) {
   if (!raw || typeof raw !== 'object' || Object.keys(raw).some(key => key !== 'profileDir') || (raw.profileDir !== undefined && typeof raw.profileDir !== 'string')) throw new Error('Smart Dev 仅接受可选的 profileDir 部署配置');
   const manager = new Manager(await locateProfile(raw.profileDir), {
     presets: () => ctx.agentPresets.list(),
+    copyPreset: (from, id, name) => ctx.agentPresets.copy(from, id, name),
     registered: () => ctx.subagents.list(),
     agents: () => ctx.agents.list().map(agent => ({
       preset: ctx.sessionProjections.stateOf(agent.session, 'agentPreset') ?? '',

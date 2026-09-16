@@ -10,11 +10,11 @@ export function backend(id: unknown) {
 }
 export interface Preferences { guidancePresets: string[] }
 export interface BackendStatus { id: BackendId; installed: boolean; version?: string; bundled: boolean; registered: boolean }
-export interface PresetStatus { id: string; name: string; writable: boolean; revision: string; enabled: BackendId[]; managed: boolean; guidance: boolean; error?: string }
+export interface PresetStatus { id: string; name: string; writable: boolean; copyable?: boolean; revision: string; enabled: BackendId[]; managed: boolean; guidance: boolean; error?: string }
 export interface Status {
   profile: string; backends: BackendStatus[]; presets: PresetStatus[];
   agents: { preset: string; tools: string[] }[];
 }
-export interface Request { action: 'status' | 'install' | 'enable' | 'restore' | 'guidance' | 'auth'; backend?: BackendId; preset?: string; revision?: string; enabled?: boolean }
-export interface Reply { status?: Status; message?: string; auth?: 'authenticated' | 'not-authenticated' | 'unknown'; login?: string }
+export interface Request { action: 'collaborate' | 'status' | 'install' | 'enable' | 'restore' | 'guidance' | 'auth'; backend?: BackendId; preset?: string; revision?: string; enabled?: boolean }
+export interface Reply { selectedPreset?: string; status?: Status; message?: string; auth?: 'authenticated' | 'not-authenticated' | 'unknown'; login?: string }
 export type Api = (request: Request) => Promise<Reply>;

@@ -12,7 +12,7 @@ try {
   await writeFile(join(root, 'pnpm-workspace.yaml'), 'packages: [.]\nnodeLinker: hoisted\nautoInstallPeers: false\n');
   const preset = join(root, 'agent.cordis.yml');
   await writeFile(preset, '- id: persona\n  name: "@deepseek-ai/dsh-persona"\n  config:\n    prefix: Test persona\n');
-  const manager = new Manager(root, { presets: async () => [{ id: 'test', path: preset, trust: 'user' }], registered: () => [], agents: () => [] });
+  const manager = new Manager(root, { copyPreset: async () => { throw new Error('Not used'); }, presets: async () => [{ id: 'test', path: preset, trust: 'user' }], registered: () => [], agents: () => [] });
   await manager.init();
   for (const backend of ['codex', 'claude-code']) {
     const revision = hash(await readFile(preset, 'utf8'));

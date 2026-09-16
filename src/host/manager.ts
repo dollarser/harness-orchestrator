@@ -14,6 +14,7 @@ interface Manifest { dependencies?: Record<string, string>; dsh?: { profile?: { 
 interface Journal { before: string; after: string }
 export interface Host {
   presets(): Promise<Preset[]>;
+  copyPreset(from: string, id: string, name: string): Promise<void>;
   registered(): string[];
   agents(): Status['agents'];
 }
@@ -65,7 +66,7 @@ export class Manager {
       try {
         const content = await readFile(preset.path, 'utf8');
         presets.push({ id: preset.id, name: preset.name ?? preset.id, writable: preset.trust === 'user' && !preset.broken,
-          revision: hash(content), enabled: enabledBackends(content), managed: !!await readJson<Journal | null>(this.journalPath(preset.id), null),
+          copyable: preset.trust === 'system' && !preset.broken, revision: hash(content), enabled: enabledBackends(content), managed: !!await readJson<Journal | null>(this.journalPath(preset.id), null),
           guidance: this.preferences.guidancePresets.includes(preset.id), ...(preset.broken ? { error: preset.broken } : {}) });
       } catch { presets.push({ id: preset.id, name: preset.name ?? preset.id, writable: false, revision: '', enabled: [], managed: false, guidance: false, error: '无法读取或解析预设' }); }
     }
@@ -79,7 +80,7 @@ export class Manager {
     if (!request || typeof request !== 'object') throw new Error('无效请求');
     if (request.action === 'status') return { status: await this.status() };
     if (request.action === 'auth') return this.auth(backend(request.backend).id);
-    if (!['install', 'enable', 'restore', 'guidance'].includes(request.action)) throw new Error('未知操作');
+    if (!['collaborate', 'install', 'enable', 'restore', 'guidance'].includes(request.action)) throw new Error('未知操作');
     if (this.busy) throw new Error('另一项接入操作正在进行，请稍后刷新');
     this.busy = true;
     let locked = false;
@@ -88,6 +89,7 @@ export class Manager {
       try { await mkdir(join(this.dir, 'operation.lock')); locked = true; }
       catch { throw new Error('接入配置正被其他操作占用；如果上次进程异常退出，请确认无安装进程后移除 .smart-dev/operation.lock'); }
       let message: string;
+      if (request.action === 'collaborate') return await this.collaborate(request);
       if (request.action === 'install') {
         const id = backend(request.backend).id;
         const preset = request.preset === undefined ? undefined : await this.preset(request.preset);
@@ -129,6 +131,35 @@ export class Manager {
     } finally {
       try { if (locked) { const { rmdir } = await import('node:fs/promises'); await rmdir(join(this.dir, 'operation.lock')); } }
       finally { this.busy = false; }
+    }
+  }
+  private async collaborate(request: Request): Promise<Reply> {
+    const roster = await this.host.presets();
+    const source = roster.find(p => p.id === request.preset);
+    if (!source || source.trust !== 'system' || source.broken) throw new Error('请选择可用的内置预设');
+    if (hash(await readFile(source.path, 'utf8')) !== request.revision) throw new Error('源预设已更改，请刷新后重试');
+    const mappingPath = join(this.dir, 'copies.json');
+    const copies = await readJson<Record<string, string>>(mappingPath, {});
+    const id = copies[source.id] ?? `smart-dev-${source.id}`;
+    const existing = roster.find(p => p.id === id);
+    if (existing && copies[source.id] !== id) throw new Error(`预设 ${id} 已存在且不由 Smart Dev 管理，请先重命名该预设`);
+    if (!existing) {
+      await this.host.copyPreset(source.id, id, `${source.name ?? source.id} · 协作版`);
+      copies[source.id] = id;
+      await atomic(mappingPath, JSON.stringify(copies, null, 2));
+    }
+    try {
+      const target = await this.preset(id);
+      for (const item of backends) {
+        await this.install(item.id);
+        await this.enable(target, item.id, hash(await readFile(target.path, 'utf8')));
+      }
+      const next = { guidancePresets: [...new Set([...this.preferences.guidancePresets, id])] };
+      await atomic(join(this.dir, 'preferences.json'), JSON.stringify(next, null, 2));
+      this.preferences = next;
+      return { selectedPreset: id, status: await this.status(), message: `协作版已就绪：${target.name ?? id}。已启用 Codex、Claude Code 和分工指引。请重启 DSH，然后新建会话，在输入框上方的模式选择器选择该协作版；当前会话模式不会自动改变。` };
+    } catch (error) {
+      throw new Error(`协作版 ${id} 已保留，但接入未全部完成：${error instanceof Error ? error.message : String(error)}。可重新选择原内置模式并点击创建协作版继续，或刷新后选择该副本处理。`);
     }
   }
   private async enable(preset: Preset, id: BackendId, revision: string | undefined) {

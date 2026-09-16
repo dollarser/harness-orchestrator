@@ -24,6 +24,7 @@ export function SettingsPage({ api }: { api: Api }) {
       const reply = await api(request);
       if (generation.current !== current) return;
       if (reply.status) setStatus(reply.status);
+      if (reply.selectedPreset) select(reply.selectedPreset);
       setNotice(reply.message ?? '状态已刷新');
       if (reply.auth && request.backend) setAuth(old => ({ ...old, [request.backend!]: `${reply.auth === 'authenticated' ? '已登录' : reply.auth === 'not-authenticated' ? '未登录' : '未知'}。${reply.message} 登录命令：${reply.login}` }));
     } catch (err) { if (generation.current === current) setError(err instanceof Error ? err.message : String(err)); }
@@ -37,7 +38,7 @@ export function SettingsPage({ api }: { api: Api }) {
     <p role="status">{busy ? '正在处理，请勿关闭或重启 DSH…' : notice}</p>
     {!status ? <p>正在读取宿主接入状态…</p> : <>
       <section className="sd-card"><h3>应用到 Agent 预设</h3><label className="sd-field">Agent 预设<select aria-label="Agent 预设" disabled={busy} value={selected} onChange={e => select(e.target.value)}><option value="">请选择预设</option>{status.presets.map(p => <option key={p.id} value={p.id}>{p.name}{p.writable ? '' : '（只读）'}</option>)}</select></label>
-      <p>只修改所选用户预设。系统预设请先在 DSH 中复制。工具配置变更后请重启 DSH。</p>{preset?.error && <p role="alert">{preset.error}</p>}</section>
+      <p>内置模式可一键创建协作版，自动启用两个后端和分工指引。原模式保留；工具配置变更后请重启 DSH。</p>{preset?.copyable && <button disabled={busy} onClick={() => void act({ action: 'collaborate', preset: preset.id, revision: preset.revision })}>创建协作版并启用</button>}{preset?.error && <p role="alert">{preset.error}</p>}</section>
       {backends.map(item => {
         const state = status.backends.find(b => b.id === item.id);
         return <section className="sd-card" key={item.id}><h3>{item.title}</h3>

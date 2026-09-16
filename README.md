@@ -16,7 +16,7 @@ Smart Dev 为 DeepSeek Harness 接通 Codex、Claude Code：检测后端状态�
 
 打开 **DSH 设置 → Smart Dev**：
 
-1. 选择要接入的用户 Agent 预设。系统预设先在 DSH 中复制。
+1. 选择要接入的用户 Agent 预设。内置模式点击“创建协作版并启用”，自动复制为用户预设并启用两个后端与分工指引。
 2. 点击“安装并启用”，或为已安装后端点击“启用工具”。
 3. 按提示重启 DSH，打开对应预设会话，再刷新检查实际工具可见性。
 4. 检测登录，根据页面命令完成 CLI 登录。
@@ -36,7 +36,7 @@ npm run check
 npm run test:ui
 npm pack
 # 在 DSH 源码目录运行，tarball 使用绝对路径：
-pnpm dsh plugin --profile web add /absolute/path/dollarser-dsh-smart-dev-0.6.0.tgz
+pnpm dsh plugin --profile web add /absolute/path/dollarser-dsh-smart-dev-0.7.0.tgz
 ```
 
 该包提供 Host 插件与 Web 配置页。需要在 Profile 的 `cordis.patch.yml` 中添加 Host 入口：

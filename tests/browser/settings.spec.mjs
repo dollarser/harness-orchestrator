@@ -47,3 +47,11 @@ test('mobile layout has no horizontal overflow', async ({ page }) => {
   await page.getByLabel('Agent 预设').selectOption('user');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
+test('built-in preset can create collaboration copy and shows switching instructions', async ({ page }) => {
+  await page.goto('/'); await page.getByLabel('Agent 预设').selectOption('standard');
+  await page.getByRole('button', { name:'创建协作版并启用' }).click();
+  await expect(page.getByLabel('Agent 预设')).toHaveValue('smart-dev-standard');
+  await expect(page.getByLabel('注入分工指引')).toBeChecked();
+  await expect(page.getByRole('status')).toContainText('新建会话');
+  await expect(page.getByRole('status')).toContainText('当前会话模式不会自动改变');
+});
