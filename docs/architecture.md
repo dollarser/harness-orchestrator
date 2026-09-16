@@ -20,9 +20,11 @@ CLI 登录检测只检查标准 CLI 的账户状态。不证明用户自定义�
 
 ## 提示词
 
-在 `systemPrompt` 注册一个可撤销的 `smart-dev:delegation` section。每次组装时使用 DSH `agentPreset` session projection 获取当前预设，并读取所选预设开关。不会直接修改 persona；切换预设后也不会继续依赖创建时的 header。无 Agent 的诊断组装不注入指引。
+在 `systemPrompt` 注册一个可撤销的 `smart-dev:delegation` section。每次组装时使用 DSH `agentPreset` session projection 获取当前预设，并读取所选预设开关和已保存的文字。不会直接修改 persona；切换预设后也不会继续依赖创建时的 header。无 Agent 的诊断组装不注入指引。
 
 关闭开关后下次组装不包含指引。Cordis 卸载该插件会移除 section 与 API；已进入会话历史的文字不会被回溯删除。
+
+自定义文字存于 Profile 的 `.smart-dev/guidance-texts.json`，按预设 ID 索引；没有自定义值时使用内置默认文字。保存使用内容修订校验，防止跨页面覆盖。注入关闭模板插值，用户文字中的花括号保持原样。
 
 ## 安装和配置修改
 
@@ -41,5 +43,4 @@ CLI 登录检测只检查标准 CLI 的账户状态。不证明用户自定义�
 - 提示词开关由本进程持有；不要同时运行多个 DSH 进程写同一 Profile。
 - 异常退出可能遗留 `.smart-dev/operation.lock`；确认没有安装进程后才能删除。
 - 还原功能仅还原本插件实际修改的工具配置，保留原来启用的工具和已安装依赖。
-- 不兼容旧编排配置，不迁移旧 persona 中人为追加的指引；需要用户移除旧片段，防止重复。
 - 不提供任务超时、目录锁、Git 快照或额外报告；这些不属于接入助手职责。

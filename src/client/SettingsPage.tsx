@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { backends, type Api, type Request, type Status } from '../shared/types.js';
-import { delegationGuidance } from '../shared/delegation.js';
+import { GuidanceEditor } from './GuidanceEditor.js';
 import { styles } from './styles.js';
 export function SettingsPage({ api }: { api: Api }) {
   const [status, setStatus] = React.useState<Status>();
@@ -27,6 +27,7 @@ export function SettingsPage({ api }: { api: Api }) {
       if (reply.selectedPreset) select(reply.selectedPreset);
       setNotice(reply.message ?? '状态已刷新');
       if (reply.auth && request.backend) setAuth(old => ({ ...old, [request.backend!]: `${reply.auth === 'authenticated' ? '已登录' : reply.auth === 'not-authenticated' ? '未登录' : '未知'}。${reply.message} 登录命令：${reply.login}` }));
+      return reply;
     } catch (err) { if (generation.current === current) setError(err instanceof Error ? err.message : String(err)); }
     finally { if (generation.current === current) setBusy(false); }
   }
@@ -51,7 +52,7 @@ export function SettingsPage({ api }: { api: Api }) {
           {auth[item.id] && <p>{auth[item.id]}</p>}
         </section>;
       })}
-      <section className="sd-card"><h3>分工指引</h3><label><input type="checkbox" aria-label="注入分工指引" disabled={busy || !preset?.writable} checked={preset?.guidance ?? false} onChange={e => void act({ action: 'guidance', preset: preset!.id, revision: preset!.revision, enabled: e.target.checked })} /> 为所选预设注入非强制的分工指引</label><p>独立提示词片段，保留原有 persona。关闭或卸载本插件即停止注入；下次组装提示词生效。</p><details><summary>查看指引内容</summary><p>{delegationGuidance}</p></details></section>
+      <section className="sd-card"><h3>分工指引</h3><label><input type="checkbox" aria-label="注入分工指引" disabled={busy || !preset?.writable} checked={preset?.guidance ?? false} onChange={e => void act({ action: 'guidance', preset: preset!.id, revision: preset!.revision, enabled: e.target.checked })} /> 为所选预设注入非强制的分工指引</label><p>独立提示词片段，保留原有 persona。关闭或卸载本插件即停止注入；下次组装提示词生效。</p><p>每个预设独立保存指引内容；保存内容不会自动打开注入开关。</p>{preset && <GuidanceEditor key={preset.id} preset={preset} busy={busy} act={act} />}</section>
       <section className="sd-card"><h3>运行中的 Agent</h3><p>以下仅表示工具已注册到 Agent；登录检测与真实模型调用是不同的检查。</p>{status.agents.filter(a => !selected || a.preset === selected).map((a, i) => <p key={i}>{a.preset || '无预设'}：{a.tools.join('、') || '未发现外部委派工具'}</p>)}{!status.agents.some(a => !selected || a.preset === selected) && <p>暂无该预设的运行实例。重启后打开对应会话，再刷新检查。</p>}</section>
       <details><summary>维护与卸载</summary><p>Profile：{status.profile}</p><p>卸载前可关闭指引并还原 Smart Dev 对所选工具预设的修改。已安装后端和原先启用的工具会保留；不会自动删除依赖。</p><button disabled={busy || !preset?.managed || !preset.writable} onClick={() => void act({ action: 'restore', preset: preset!.id, revision: preset!.revision })}>还原本插件对预设的修改</button></details>
     </>}

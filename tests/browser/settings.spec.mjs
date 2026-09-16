@@ -55,3 +55,21 @@ test('built-in preset can create collaboration copy and shows switching instruct
   await expect(page.getByRole('status')).toContainText('新建会话');
   await expect(page.getByRole('status')).toContainText('当前会话模式不会自动改变');
 });
+test('custom guidance saves, survives reload, and restores default', async ({page}) => {
+  await page.goto('/'); await page.getByLabel('Agent 预设').selectOption('user');
+  const original = await page.getByLabel('指引内容', {exact:true}).inputValue();
+  await page.getByLabel('指引内容', {exact:true}).fill('按任务需要自主决定如何委派');
+  await page.getByRole('button',{name:'保存指引',exact:true}).click();
+  await expect(page.getByLabel('注入分工指引')).not.toBeChecked();
+  await page.reload(); await page.getByLabel('Agent 预设').selectOption('user');
+  await expect(page.getByLabel('指引内容',{exact:true})).toHaveValue('按任务需要自主决定如何委派');
+  await page.getByRole('button',{name:'恢复默认指引',exact:true}).click();
+  await expect(page.getByLabel('指引内容',{exact:true})).toHaveValue(original);
+});
+test('failed guidance save preserves the draft', async ({page}) => {
+  await page.goto('/?conflict'); await page.getByLabel('Agent 预设').selectOption('user');
+  await page.getByLabel('指引内容',{exact:true}).fill('保留这个草稿');
+  await page.getByRole('button',{name:'保存指引',exact:true}).click();
+  await expect(page.getByRole('alert')).toContainText('预设已更改');
+  await expect(page.getByLabel('指引内容',{exact:true})).toHaveValue('保留这个草稿');
+});

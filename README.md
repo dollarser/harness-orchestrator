@@ -9,7 +9,7 @@ Smart Dev 为 DeepSeek Harness 接通 Codex、Claude Code：检测后端状态�
 - 配置页分别显示包安装、Profile Bundle、当前后端注册、预设工具配置及运行中 Agent 的工具可见性。
 - 选择用户 Agent 预设，一键安装并启用 Codex / Claude Code；不改其他预设、模型或权限配置。
 - 检测 CLI 登录状态，只返回概括结果；交互登录由用户在终端完成。
-- 非强制分工指引通过独立 system prompt section 注入，保留原有 persona。可随时关闭，插件卸载后停止注入。
+- 分工指引可按预设编辑、保存、恢复默认，通过独立 system prompt section 注入，保留原有 persona。可随时关闭，插件卸载后停止注入。
 - 修改预设前保存可还原记录；有外部编辑时拒绝自动覆盖。安装前备份 Profile 清单与锁文件。
 
 ## 使用
@@ -36,7 +36,7 @@ npm run check
 npm run test:ui
 npm pack
 # 在 DSH 源码目录运行，tarball 使用绝对路径：
-pnpm dsh plugin --profile web add /absolute/path/dollarser-dsh-smart-dev-0.7.0.tgz
+pnpm dsh plugin --profile web add /absolute/path/dollarser-dsh-smart-dev-0.8.0.tgz
 ```
 
 该包提供 Host 插件与 Web 配置页。需要在 Profile 的 `cordis.patch.yml` 中添加 Host 入口：
@@ -68,5 +68,3 @@ npm run check
 npm run test:ui
 npm pack --dry-run
 ```
-
-0.6.0 不兼容旧的任务执行配置。0.5 及更早版本的编排实现可在 Git 历史中查阅。旧任务记录不读取、不删除。

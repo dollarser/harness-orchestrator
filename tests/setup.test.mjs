@@ -168,3 +168,18 @@ test('failed setup keeps the copy and retries it instead of creating duplicates'
   assert.equal(reply.selectedPreset, 'smart-dev-standard');
   assert.equal(f.presets.filter(p => p.id === 'smart-dev-standard').length, 1);
 });
+test('custom guidance is isolated per preset, persists, rejects stale writes and resets to default', async t => {
+  const f = await fixture(t);
+  const first = (await f.manager.status()).presets.find(p => p.id === 'user');
+  const request = { action:'guidance-text', preset:'user', revision:await f.revision(), guidanceRevision:first.guidanceRevision, text:'Use agents when helpful. {{literal}}' };
+  const result = await f.manager.dispatch(request);
+  const saved = result.status.presets.find(p => p.id === 'user');
+  assert.equal(saved.guidanceText, request.text); assert.equal(saved.guidance, false);
+  assert.equal(result.status.presets.find(p => p.id === 'standard').guidanceText, first.guidanceText);
+  await f.manager.init(); assert.equal(f.manager.guidanceText('user'), request.text);
+  await assert.rejects(f.manager.dispatch(request), /其他页面/);
+  await assert.rejects(f.manager.dispatch({ ...request, guidanceRevision:saved.guidanceRevision, text:'  ' }), /不能全为空白/);
+  const reset = await f.manager.dispatch({ ...request, guidanceRevision:saved.guidanceRevision, text:null });
+  assert.equal(reset.status.presets.find(p => p.id === 'user').guidanceText, first.guidanceText);
+  assert.equal(await readFile(f.file,'utf8'), source);
+});

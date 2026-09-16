@@ -6,6 +6,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { backend, backends, type BackendId, type Preferences, type PresetStatus, type Request, type Reply, type Status } from '../shared/types.js';
 import { atomic, hash, readJson } from './files.js';
+import { delegationGuidance } from '../shared/delegation.js';
 import { enabledBackends, enableBackend } from './preset.js';
 
 const execute = promisify(execFile);
@@ -37,16 +38,20 @@ export async function locateProfile(explicit?: string): Promise<string> {
 
 export class Manager {
   preferences: Preferences = { guidancePresets: [] };
+  private guidanceTexts: Record<string, string> = {};
+  guidanceText(id: string) { return Object.hasOwn(this.guidanceTexts, id) ? this.guidanceTexts[id]! : delegationGuidance; }
   private busy = false;
   constructor(readonly profile: string, private host: Host, private command: Run = run) {}
   private get dir() { return join(this.profile, '.smart-dev'); }
   async init() {
+    this.guidanceTexts = await readJson<Record<string, string>>(join(this.dir, 'guidance-texts.json'), {});
+    if (!this.guidanceTexts || Array.isArray(this.guidanceTexts) || typeof this.guidanceTexts !== 'object' || Object.values(this.guidanceTexts).some(text => typeof text !== 'string' || !text.trim() || text.length > 16000)) throw new Error('指引内容配置格式无效');
     this.preferences = await readJson<Preferences>(join(this.dir, 'preferences.json'), { guidancePresets: [] });
     if (!Array.isArray(this.preferences.guidancePresets) || this.preferences.guidancePresets.some(id => typeof id !== 'string')) throw new Error('Smart Dev 提示词配置格式无效');
   }
   private async preset(id: unknown) {
     const preset = (await this.host.presets()).find(p => p.id === id);
-    if (!preset || preset.trust !== 'user' || preset.broken) throw new Error('请选择可编辑的用户 Agent 预设；系统预设请先在 DSH 中复制');
+    if (!preset || preset.trust !== 'user' || preset.broken) throw new Error('请选择可编辑的用户 Agent 预设；内置模式请使用“创建协作版并启用”');
     return preset;
   }
   private journalPath(id: string) { return join(this.dir, `preset-${hash(id)}.json`); }
@@ -67,8 +72,8 @@ export class Manager {
         const content = await readFile(preset.path, 'utf8');
         presets.push({ id: preset.id, name: preset.name ?? preset.id, writable: preset.trust === 'user' && !preset.broken,
           copyable: preset.trust === 'system' && !preset.broken, revision: hash(content), enabled: enabledBackends(content), managed: !!await readJson<Journal | null>(this.journalPath(preset.id), null),
-          guidance: this.preferences.guidancePresets.includes(preset.id), ...(preset.broken ? { error: preset.broken } : {}) });
-      } catch { presets.push({ id: preset.id, name: preset.name ?? preset.id, writable: false, revision: '', enabled: [], managed: false, guidance: false, error: '无法读取或解析预设' }); }
+          guidanceText: this.guidanceText(preset.id), guidanceRevision: hash(this.guidanceText(preset.id)), guidance: this.preferences.guidancePresets.includes(preset.id), ...(preset.broken ? { error: preset.broken } : {}) });
+      } catch { presets.push({ id: preset.id, name: preset.name ?? preset.id, writable: false, revision: '', enabled: [], managed: false, guidance: false, guidanceText: '', guidanceRevision: '', error: '无法读取或解析预设' }); }
     }
     return { profile: this.profile, presets, agents: this.host.agents(), backends: await Promise.all(backends.map(async item => {
       const pkg = await this.installed(item.id);
@@ -80,7 +85,7 @@ export class Manager {
     if (!request || typeof request !== 'object') throw new Error('无效请求');
     if (request.action === 'status') return { status: await this.status() };
     if (request.action === 'auth') return this.auth(backend(request.backend).id);
-    if (!['collaborate', 'install', 'enable', 'restore', 'guidance'].includes(request.action)) throw new Error('未知操作');
+    if (!['guidance-text', 'collaborate', 'install', 'enable', 'restore', 'guidance'].includes(request.action)) throw new Error('未知操作');
     if (this.busy) throw new Error('另一项接入操作正在进行，请稍后刷新');
     this.busy = true;
     let locked = false;
@@ -105,7 +110,15 @@ export class Manager {
         const preset = await this.preset(request.preset);
         const text = await readFile(preset.path, 'utf8');
         if (request.revision !== hash(text)) throw new Error('预设已更改，请刷新后重试');
-        if (request.action === 'guidance') {
+        if (request.action === 'guidance-text') {
+          if (request.guidanceRevision !== hash(this.guidanceText(preset.id))) throw new Error('指引已被其他页面修改，请载入最新内容后重试');
+          if (request.text !== null && (typeof request.text !== 'string' || !request.text.trim() || request.text.length > 16000)) throw new Error('指引内容需为 1–16000 个字符，不能全为空白');
+          const next = { ...this.guidanceTexts };
+          if (request.text === null) delete next[preset.id]; else next[preset.id] = request.text;
+          await atomic(join(this.dir, 'guidance-texts.json'), JSON.stringify(next, null, 2));
+          this.guidanceTexts = next;
+          message = request.text === null ? '已恢复默认指引，下次组装提示词生效。' : '指引已保存，下次组装提示词生效。';
+        } else if (request.action === 'guidance') {
           if (typeof request.enabled !== 'boolean') throw new Error('请选择提示词开关');
           const ids = new Set(this.preferences.guidancePresets);
           request.enabled ? ids.add(preset.id) : ids.delete(preset.id);

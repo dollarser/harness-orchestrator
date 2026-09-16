@@ -8,7 +8,6 @@ import type {} from '@deepseek-ai/dsh-subagent';
 import type {} from '@deepseek-ai/dsh-tools';
 import { Manager, locateProfile } from '../host/manager.js';
 import { backends, type Request } from '../shared/types.js';
-import { delegationGuidance } from '../shared/delegation.js';
 
 export const name = 'smart-dev';
 export const inject = ['connection', 'agentPresets', 'agents', 'tools', 'subagents', 'systemPrompt', 'sessionProjections'];
@@ -25,11 +24,11 @@ export async function apply(ctx: Context, raw: { profileDir?: string } = {}) {
   });
   await manager.init();
   ctx.effect(() => ctx.systemPrompt.section({
-    name: 'smart-dev:delegation', order: 80,
+    name: 'smart-dev:delegation', order: 80, ...{ interpolate: false },
     text: ({ agent }) => {
       if (!agent) return '';
       const preset = ctx.sessionProjections.stateOf(agent.session, 'agentPreset');
-      return preset && manager.preferences.guidancePresets.includes(preset) ? delegationGuidance : '';
+      return preset && manager.preferences.guidancePresets.includes(preset) ? manager.guidanceText(preset) : '';
     },
   }));
   ctx.effect(() => ctx.connection.fetch.register({

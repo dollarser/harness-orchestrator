@@ -12,6 +12,7 @@ test('Cordis lifecycle: scoped guidance, live preset selection, exact RPC owners
   await writeFile(join(root, 'package.json'), JSON.stringify({ dsh: { profile: { bundles: [] } } }));
   await mkdir(join(root, '.smart-dev'));
   await writeFile(join(root, '.smart-dev/preferences.json'), JSON.stringify({ guidancePresets: ['chosen'] }));
+  await writeFile(join(root, '.smart-dev/guidance-texts.json'), JSON.stringify({ chosen: 'Custom delegation {{literal}}' }));
   const ctx = new Context(); let section, rpc;
   ctx.provide('connection', { fetch: { register(route) { assert.equal(route.path, '/api/smart-dev/manage'); rpc = route.fetch; return async () => { rpc = undefined; }; } } });
   const invoke = async payload => (await (await rpc(new Request('http://localhost/api/smart-dev/manage', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'client-request', rpcId: 'test', method: 'smart-dev/manage', payload }) }))).json()).result;
@@ -24,7 +25,8 @@ test('Cordis lifecycle: scoped guidance, live preset selection, exact RPC owners
   const fiber = await ctx.plugin(plugin, { profileDir: root });
   assert.equal(section.name, 'smart-dev:delegation'); assert.equal(section.text({}), '');
   const agent = { session: { currentPreset: 'chosen', header: { agentPreset: 'old' } } };
-  assert.match(section.text({ agent }), /not a required pipeline/);
+  assert.equal(section.text({ agent }), 'Custom delegation {{literal}}');
+  assert.equal(section.interpolate, false);
   agent.session.currentPreset = 'other'; assert.equal(section.text({ agent }), '');
   assert.equal((await rpc(new Request('http://localhost/api/smart-dev/manage', { method: 'POST' }))).status, 415);
   const result = await invoke({ action: 'status' }); assert.equal(result.ok, true);
