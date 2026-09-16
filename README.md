@@ -30,14 +30,14 @@ npm ci
 npm pack
 ```
 
-这会自动构建并生成 `dollarser-dsh-smart-dev-0.10.0.tgz`。记下该文件的完整路径，例如 `/Users/你的用户名/harness-orchestrator/dollarser-dsh-smart-dev-0.10.0.tgz`。
+这会自动构建并生成 `dollarser-dsh-smart-dev-0.10.1.tgz`。记下该文件的完整路径，例如 `/Users/你的用户名/harness-orchestrator/dollarser-dsh-smart-dev-0.10.1.tgz`。
 
 ### 2. 安装到 DSH
 
 进入你平时运行 `pnpm dsh web` 的 DSH 源码目录，执行以下命令，将路径替换为上一步生成的文件：
 
 ```sh
-pnpm dsh plugin --profile web add /完整路径/dollarser-dsh-smart-dev-0.10.0.tgz
+pnpm dsh plugin --profile web add /完整路径/dollarser-dsh-smart-dev-0.10.1.tgz
 ```
 
 安装命令会自动登记插件自带的启动配置，无需编辑 YAML 或填写插件入口路径。如果你使用其他 Profile，请将命令中的 `web` 改为对应名称。
@@ -82,6 +82,8 @@ claude auth login
 > 帮我修复这个项目的启动错误，并确认能正常启动。
 
 主 Agent 会结合任务、可用工具和分工指引，决定自己完成还是委派。没有固定的规划、实现、测试顺序；工具启用后，也不意味着每项任务都会调用它。
+
+工具按钮和指引开关操作成功后自动保存，页面会提示保存结果和生效时间；指引文字需要单独点击“保存指引”。
 
 ### 修改分工指引
 

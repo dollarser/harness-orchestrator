@@ -25,7 +25,9 @@ export function SettingsPage({ api }: { api: Api }) {
       if (generation.current !== current) return;
       if (reply.status) setStatus(reply.status);
       if (reply.selectedPreset) select(reply.selectedPreset);
-      setNotice(reply.message ?? '状态已刷新');
+      const saved = ['install', 'enable', 'disable', 'restore', 'collaborate', 'guidance', 'guidance-text'].includes(request.action);
+      const timing = ['guidance', 'guidance-text'].includes(request.action) ? '无需重启，下次组装提示词时生效。' : '请重启 DSH 后检查运行状态。';
+      setNotice(saved ? `已保存。${timing}${reply.message ?? ''}` : reply.message ?? '状态已刷新');
       if (reply.auth && request.backend) setAuth(old => ({ ...old, [request.backend!]: `${reply.auth === 'authenticated' ? '已登录' : reply.auth === 'not-authenticated' ? '未登录' : '未知'}。${reply.message} 登录命令：${reply.login}` }));
       return reply;
     } catch (err) { if (generation.current === current) setError(err instanceof Error ? err.message : String(err)); }
@@ -34,12 +36,13 @@ export function SettingsPage({ api }: { api: Api }) {
   return <section className="sd-page" aria-label="Smart Dev 配置"><style>{styles}</style>
     <header className="sd-header"><div><span className="sd-kicker">MULTI-AGENT SETUP</span><h2>Smart Dev</h2><p>准备协作工具，让主 Agent 自主决定如何分工。</p></div></header>
     <p>在普通 DSH 对话中提出任务。无需 /smart-dev 命令，也没有固定规划、执行或验证流程。</p>
+    <section className="sd-card" aria-label="保存方式"><h3>设置如何保存</h3><p>工具按钮和指引开关操作成功后自动保存，无需统一点击“保存设置”。修改指引文字后，请点击“保存指引”。</p><p>安装、启用或禁用工具：保存后需重启 DSH。分工指引：无需重启，下次组装提示词时生效。</p></section>
     <button disabled={busy} onClick={() => void act({ action: 'status' })}>刷新状态</button>
     {error && <p role="alert" className="sd-alert">{error}</p>}
     <p role="status">{busy ? '正在处理，请勿关闭或重启 DSH…' : notice}</p>
     {!status ? <p>正在读取宿主接入状态…</p> : <>
-      <section className="sd-card"><h3>应用到 Agent 预设</h3><label className="sd-field">Agent 预设<select aria-label="Agent 预设" disabled={busy} value={selected} onChange={e => select(e.target.value)}><option value="">请选择预设</option>{status.presets.map(p => <option key={p.id} value={p.id}>{p.name}{p.writable ? '' : '（只读）'}</option>)}</select></label>
-      <p>内置模式可一键创建协作版，自动启用两个后端和分工指引。原模式保留；工具配置变更后请重启 DSH。</p>{preset?.copyable && <button disabled={busy} onClick={() => void act({ action: 'collaborate', preset: preset.id, revision: preset.revision })}>创建协作版并启用</button>}{preset?.error && <p role="alert">{preset.error}</p>}</section>
+      <section className="sd-card"><h3>应用到 Agent 预设</h3><label className="sd-field">Agent 预设<select aria-label="Agent 预设" disabled={busy} value={selected} onChange={e => { select(e.target.value); setNotice(''); setError(''); }}><option value="">请选择预设</option>{status.presets.map(p => <option key={p.id} value={p.id}>{p.name}{p.writable ? '' : '（只读）'}</option>)}</select></label>
+      <p>此处只选择要编辑的预设，不改变当前会话模式。</p><p>内置模式可一键创建协作版，自动启用两个后端和分工指引。原模式保留；工具配置变更后请重启 DSH。</p>{preset?.copyable && <button disabled={busy} onClick={() => void act({ action: 'collaborate', preset: preset.id, revision: preset.revision })}>创建协作版并启用</button>}{preset?.error && <p role="alert">{preset.error}</p>}</section>
       {backends.map(item => {
         const state = status.backends.find(b => b.id === item.id);
         return <section className="sd-card" key={item.id}><h3>{item.title}</h3>

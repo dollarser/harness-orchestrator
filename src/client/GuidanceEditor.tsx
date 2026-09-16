@@ -17,7 +17,8 @@ export function GuidanceEditor({ preset, busy, act }: { preset: PresetStatus; bu
   return <div>
     <label className="sd-field">指引内容<textarea aria-label="指引内容" rows={10} maxLength={16000} value={draft} disabled={busy || !preset.writable} onChange={event => setDraft(event.target.value)} /></label>
     {stale && dirty && <p role="alert">指引已更新，当前草稿保留。请先载入最新内容，再合并修改。</p>}
-    <p>{draft.length}/16000 字符{dirty ? ' · 有未保存的修改' : ''}</p>
+    <p>{draft.length}/16000 字符{dirty ? ' · 有未保存的修改，请点击“保存指引”' : ' · 与已保存内容一致'}</p>
+    <p>恢复默认指引会立即保存；放弃修改只撤销当前草稿。切换预设或关闭页面前，请先保存需要保留的文字。</p>
     <div className="sd-footer">
       <button disabled={busy || !preset.writable || !dirty || stale || !draft.trim()} onClick={() => void save(false)}>保存指引</button>
       <button disabled={busy || !preset.writable || stale} onClick={() => void save(true)}>恢复默认指引</button>

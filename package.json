@@ -1,6 +1,6 @@
 {
   "name": "@dollarser/dsh-smart-dev",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "Native DSH multi-agent setup, diagnostics and optional delegation guidance",
   "type": "module",
   "license": "MIT",
