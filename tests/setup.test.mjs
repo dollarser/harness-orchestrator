@@ -183,3 +183,14 @@ test('custom guidance is isolated per preset, persists, rejects stale writes and
   assert.equal(reset.status.presets.find(p => p.id === 'user').guidanceText, first.guidanceText);
   assert.equal(await readFile(f.file,'utf8'), source);
 });
+test('disable only selected backend, works without installed package and can re-enable', async t => {
+  const f = await fixture(t); await f.installFake(); await f.installFake('claude-code');
+  for (const backend of ['codex','claude-code']) await f.manager.dispatch({action:'enable', backend, preset:'user', revision:await f.revision()});
+  await f.manager.dispatch({action:'disable', backend:'codex', preset:'user', revision:await f.revision()});
+  assert.deepEqual(enabledBackends(await readFile(f.file,'utf8')), ['claude-code']);
+  await f.manager.dispatch({action:'enable', backend:'codex', preset:'user', revision:await f.revision()});
+  assert.ok(enabledBackends(await readFile(f.file,'utf8')).includes('codex'));
+  await rm(join(f.profile,'node_modules'),{recursive:true});
+  await f.manager.dispatch({action:'disable', backend:'codex', preset:'user', revision:await f.revision()});
+  assert.deepEqual(enabledBackends(await readFile(f.file,'utf8')), ['claude-code']);
+});

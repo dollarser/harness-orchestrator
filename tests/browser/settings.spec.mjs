@@ -73,3 +73,10 @@ test('failed guidance save preserves the draft', async ({page}) => {
   await expect(page.getByRole('alert')).toContainText('预设已更改');
   await expect(page.getByLabel('指引内容',{exact:true})).toHaveValue('保留这个草稿');
 });
+test('enabled backend can be disabled and enabled again',async({page})=>{
+  await page.goto('/'); await page.getByLabel('Agent 预设').selectOption('user');
+  await page.getByRole('button',{name:'启用 Codex 工具',exact:true}).click();
+  await page.getByRole('button',{name:'禁用 Codex 工具',exact:true}).click();
+  await expect(page.getByRole('button',{name:'启用 Codex 工具',exact:true})).toBeEnabled();
+  await expect(page.getByRole('button',{name:'禁用 Codex 工具',exact:true})).toBeDisabled();
+});

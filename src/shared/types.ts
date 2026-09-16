@@ -15,6 +15,6 @@ export interface Status {
   profile: string; backends: BackendStatus[]; presets: PresetStatus[];
   agents: { preset: string; tools: string[] }[];
 }
-export interface Request { action: 'guidance-text' | 'collaborate' | 'status' | 'install' | 'enable' | 'restore' | 'guidance' | 'auth'; backend?: BackendId; preset?: string; revision?: string; enabled?: boolean; text?: string | null; guidanceRevision?: string }
+export interface Request { action: 'disable' | 'guidance-text' | 'collaborate' | 'status' | 'install' | 'enable' | 'restore' | 'guidance' | 'auth'; backend?: BackendId; preset?: string; revision?: string; enabled?: boolean; text?: string | null; guidanceRevision?: string }
 export interface Reply { selectedPreset?: string; status?: Status; message?: string; auth?: 'authenticated' | 'not-authenticated' | 'unknown'; login?: string }
 export type Api = (request: Request) => Promise<Reply>;

@@ -7,7 +7,7 @@ import { promisify } from 'node:util';
 import { backend, backends, type BackendId, type Preferences, type PresetStatus, type Request, type Reply, type Status } from '../shared/types.js';
 import { atomic, hash, readJson } from './files.js';
 import { delegationGuidance } from '../shared/delegation.js';
-import { enabledBackends, enableBackend } from './preset.js';
+import { enabledBackends, enableBackend, disableBackend } from './preset.js';
 
 const execute = promisify(execFile);
 interface Preset { id: string; name?: string; path: string; trust: string; broken?: string }
@@ -85,7 +85,7 @@ export class Manager {
     if (!request || typeof request !== 'object') throw new Error('无效请求');
     if (request.action === 'status') return { status: await this.status() };
     if (request.action === 'auth') return this.auth(backend(request.backend).id);
-    if (!['guidance-text', 'collaborate', 'install', 'enable', 'restore', 'guidance'].includes(request.action)) throw new Error('未知操作');
+    if (!['disable', 'guidance-text', 'collaborate', 'install', 'enable', 'restore', 'guidance'].includes(request.action)) throw new Error('未知操作');
     if (this.busy) throw new Error('另一项接入操作正在进行，请稍后刷新');
     this.busy = true;
     let locked = false;
@@ -136,8 +136,8 @@ export class Manager {
         } else {
           const id = backend(request.backend).id;
           const state = (await this.status()).backends.find(b => b.id === id)!;
-          if (!state.installed || !state.bundled) throw new Error('请先安装并注册该后端');
-          message = await this.enable(preset, id, request.revision);
+          if (request.action !== 'disable' && (!state.installed || !state.bundled)) throw new Error('请先安装并注册该后端');
+          message = await this.enable(preset, id, request.revision, request.action !== 'disable');
         }
       }
       return { message, status: await this.status() };
@@ -175,10 +175,10 @@ export class Manager {
       throw new Error(`协作版 ${id} 已保留，但接入未全部完成：${error instanceof Error ? error.message : String(error)}。可重新选择原内置模式并点击创建协作版继续，或刷新后选择该副本处理。`);
     }
   }
-  private async enable(preset: Preset, id: BackendId, revision: string | undefined) {
+  private async enable(preset: Preset, id: BackendId, revision: string | undefined, enabled = true) {
     const text = await readFile(preset.path, 'utf8');
     if (hash(text) !== revision) throw new Error('预设已更改，请刷新后重试');
-    const output = enableBackend(text, id);
+    const output = enabled ? enableBackend(text, id) : disableBackend(text, id);
     if (output !== text) {
       const old = await readJson<Journal | null>(this.journalPath(preset.id), null);
       if (old && text !== old.after) throw new Error('预设存在外部修改，请先合并已有 Smart Dev 备份');
@@ -186,7 +186,7 @@ export class Manager {
       if (await readFile(preset.path, 'utf8') !== text) throw new Error('预设在保存前发生更改，请检查备份后重试');
       await atomic(preset.path, output);
     }
-    return output === text ? '此预设已配置该工具；请查看运行中 Agent 的工具状态。' : '工具已启用。请重启 DSH，使已加载的预设重新生效。';
+    return output === text ? '工具配置无需更改；请查看运行实例状态。' : `工具已${enabled ? '启用' : '禁用'}。请重启 DSH，使已加载的预设重新生效。`;
   }
   private async install(id: BackendId) {
     const item = backend(id);

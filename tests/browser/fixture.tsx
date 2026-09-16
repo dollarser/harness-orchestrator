@@ -25,6 +25,7 @@ const api: Api = async request => {
     return { status: structuredClone(state!), selectedPreset: copied.id, message: '协作版已就绪。请重启 DSH，然后新建会话选择 Standard · 协作版；当前会话模式不会自动改变。' };
   }
   const preset = state!.presets.find(p => p.id === request.preset);
+  if (request.action === 'disable' && preset) preset.enabled = preset.enabled.filter(id => id !== request.backend);
   if (request.action === 'enable' && preset && request.backend) { preset.enabled.push(request.backend); preset.managed = true; }
   if (request.action === 'guidance-text' && preset) { preset.guidanceText = request.text === null ? delegationGuidance : request.text!; preset.guidanceRevision += 'x'; }
   if (request.action === 'guidance' && preset) preset.guidance = request.enabled!;

@@ -48,6 +48,7 @@ export function SettingsPage({ api }: { api: Api }) {
           <p>所选预设工具：{preset ? preset.enabled.includes(item.id) ? '已配置启用' : '未启用' : '尚未选择预设'}</p>
           <div className="sd-footer"><button disabled={busy || !preset?.writable || !!(state?.installed && state.bundled)} onClick={() => void act({ action: 'install', backend: item.id, preset: preset!.id, revision: preset!.revision })}>安装并启用 {item.title}</button>
           <button disabled={busy || !preset?.writable || !state?.installed || !state.bundled || preset.enabled.includes(item.id)} onClick={() => void act({ action: 'enable', backend: item.id, preset: preset!.id, revision: preset!.revision })}>启用 {item.title} 工具</button>
+          <button disabled={busy || !preset?.writable || !preset.enabled.includes(item.id)} onClick={() => void act({ action: 'disable', backend: item.id, preset: preset!.id, revision: preset!.revision })}>禁用 {item.title} 工具</button>
           <button disabled={busy || !state?.installed} onClick={() => void act({ action: 'auth', backend: item.id })}>检测 {item.title} 登录</button></div>
           {auth[item.id] && <p>{auth[item.id]}</p>}
         </section>;

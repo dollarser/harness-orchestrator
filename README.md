@@ -1,6 +1,6 @@
 # Smart Dev · DSH 多 Agent 接入助手
 
-Smart Dev 为 DeepSeek Harness 接通 Codex、Claude Code：检测后端状态、安装依赖、启用选定 Agent 预设的原生工具，并按需注入分工指引。
+Smart Dev 为 DeepSeek Harness 接通 Codex、Claude Code：检测后端状态、安装依赖、启用或禁用选定 Agent 预设的原生工具，并按需注入分工指引。
 
 **在普通 DSH 对话中提出任务，由主 Agent 自主决定直接完成或委派。** 本插件不接管任务，不提供 `/smart-dev` 命令，不规定规划、检查、修复或审查流程。
 
@@ -36,7 +36,7 @@ npm run check
 npm run test:ui
 npm pack
 # 在 DSH 源码目录运行，tarball 使用绝对路径：
-pnpm dsh plugin --profile web add /absolute/path/dollarser-dsh-smart-dev-0.8.0.tgz
+pnpm dsh plugin --profile web add /absolute/path/dollarser-dsh-smart-dev-0.9.0.tgz
 ```
 
 该包提供 Host 插件与 Web 配置页。需要在 Profile 的 `cordis.patch.yml` 中添加 Host 入口：

@@ -55,3 +55,12 @@ export function enableBackend(text: string, id: BackendId): string {
   if (!enabledBackends(output).includes(id)) throw new Error('工具所在分组被禁用，请先启用该分组');
   return output;
 }
+
+export function disableBackend(text: string, id: BackendId): string {
+  const doc = document(text);
+  const found = rows(doc.contents as YAMLSeq).filter(row => matches(row, id));
+  if (!found.length) return text;
+  for (const row of found) row.set('disabled', true);
+  const output = doc.toString();
+  return enabledBackends(text).includes(id) ? output : text;
+}
