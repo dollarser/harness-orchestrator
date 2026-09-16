@@ -12,6 +12,7 @@ DSH 提供命令入口、父会话和子 Agent；插件代码负责状态机、�
 
 ## 当前实现
 
+- 原生 **Settings → Smart Dev** 配置页：编辑模型、工具、预算和验证命令，保存后从下一次任务生效。
 - TypeScript 插件，包名 `@dollarser/dsh-smart-dev`。
 - 默认 Worker 使用 DSH `spawn`，必须显式配置模型和工具列表。
 - 默认强模型预算 **2 次**：规划＋首次审查。修复后重新验证，预算不足返回 `NEEDS_REVIEW`；配置 3 次才允许一次修复后的复核。
@@ -30,22 +31,25 @@ npm ci
 npm run check
 ```
 
-开发类型依赖固定为 DSH `0.1.5-rc.1`，Cordis `4.0.2`。编译结果不导入 DSH 运行时代码，使用宿主提供的服务。见 [验证记录](docs/validation.md)。
+开发类型依赖固定为 DSH `0.1.5-rc.1`，Cordis `4.0.2`。Host 使用宿主提供的服务；浏览器页面使用 DSH 设置页插槽和设置持久化接口。见 [验证记录](docs/validation.md)。
 
 ## 安装到 DSH
 
 1. 构建本项目，安装 DSH 的 Codex subagent bundle。
 2. 在 DSH 配置实际可用的本地模型，选择干净的目标 Git worktree 根目录。
-3. 根据 [examples/config.json](examples/config.json) 配置模型、工具和目标项目验证命令。
-4. 生成 overlay，在 DSH Web profile 中加载，然后输入 `/smart-dev <task>`。
+3. 生成初始 overlay：`node scripts/create-overlay.mjs --configure /绝对路径/smart-dev.patch.yml`。
+4. 在 DSH 源码目录执行 `pnpm dsh web --patch /绝对路径/smart-dev.patch.yml`。
+5. 打开 **Settings → Smart Dev**，填写模型与验收命令、启用并保存，然后输入 `/smart-dev <task>`。
 
-完整命令见 [使用指南](docs/usage.md)。示例模型 ID 是占位符，必须替换。
+完整命令见 [使用指南](docs/usage.md)，页面行为见 [配置页说明](docs/configuration-page.md)。仍支持从 [config.json 样例](examples/config.json) 生成预配置 overlay；示例模型 ID 必须替换。
 
 ## 代码结构
 
 ```text
 src/core/       状态机、提示词、产物校验；不依赖 DSH
-src/dsh/        命令注册、配置解析、subagent 适配
+src/dsh/        命令注册、原生设置服务、subagent 适配
+src/client/     Settings → Smart Dev 页面、草稿校验、浏览器插件入口
+src/shared/     Host 与浏览器共享的配置类型和校验
 src/host/       Git 证据、工作区锁、原子产物写入、验证进程
 tests/         状态机、适配器、Cordis 生命周期与 Git/进程测试
 examples/      配置样例

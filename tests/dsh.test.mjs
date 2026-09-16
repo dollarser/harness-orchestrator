@@ -5,6 +5,7 @@ import { mkdtemp, mkdir, writeFile, readFile, readdir, rm } from 'node:fs/promis
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { MemorySettings } from './helpers/settings.mjs';
 import * as plugin from '../dist/dsh/plugin.js';
 import { invokeChild, preflight } from '../dist/dsh/backend.js';
 import { parseConfig } from '../dist/dsh/config.js';
@@ -51,6 +52,8 @@ test('real Cordis plugin lifecycle: slash command runs full workflow against fak
   await writeFile(join(cwd, 'initial'), 'initial'); git('add', 'initial'); git('commit', '-qm', 'initial');
   const ctx = new Context(), commands = new Map(), calls = []; let disposals = 0, maintained = false, block = false, begun;
   const started = new Promise(resolve => { begun = resolve; });
+  const settingsFiber = await ctx.plugin(MemorySettings);
+  t.after(() => settingsFiber.dispose());
   ctx.provide('commands', { register(def) { commands.set(def.name, def); return () => commands.delete(def.name); } });
   ctx.provide('subagents', {
     getProvider: () => ({ capabilities: caps }),
@@ -64,7 +67,10 @@ test('real Cordis plugin lifecycle: slash command runs full workflow against fak
         }), async dispose() { disposals++; } };
       }
       let output;
-      if (request.label === 'smart-dev planner') output = { summary: 'Create a file', risk: 'low', tasks: [{ id: 'T1', description: 'Write output', acceptance: ['output exists'] }] };
+      if (request.label === 'smart-dev planner') {
+        await ctx.settings.update('smart-dev', { plannerProvider: 'next-planner', reviewerProvider: 'next-reviewer', workerModel: { provider: 'local', model: 'next-model' } });
+        output = { summary: 'Create a file', risk: 'low', tasks: [{ id: 'T1', description: 'Write output', acceptance: ['output exists'] }] };
+      }
       else if (request.label === 'smart-dev reviewer') output = { decision: 'PASS', summary: 'File exists', issues: [] };
       else { await writeFile(join(cwd, 'output'), 'done'); output = 'Wrote output'; }
       return { id: `child-${calls.length}`, result: Promise.resolve({ stopReason: 'completed', output: [{ type: 'text', text: typeof output === 'string' ? output : JSON.stringify(output) }] }), async dispose() { disposals++; } };
@@ -84,7 +90,7 @@ test('real Cordis plugin lifecycle: slash command runs full workflow against fak
   // A second run blocks in a child. Unloading must abort it, dispose it and release its lock.
   git('add', 'output'); git('commit', '-qm', 'accept fixture change'); block = true;
   const pending = commands.get('smart-dev').handler({ agent, rawInput: 'Next task', signal: new AbortController().signal });
-  await started; assert.ok(maintained); await fiber.dispose();
+  await started; assert.equal(calls.at(-1), 'next-planner'); assert.ok(maintained); await fiber.dispose();
   const cancelled = await pending;
   assert.equal(cancelled.kind, 'error'); assert.match(cancelled.text, /CANCELLED/);
   assert.equal(commands.has('smart-dev'), false); assert.equal(disposals, 4); assert.equal(maintained, false);

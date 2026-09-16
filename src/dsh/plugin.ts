@@ -5,14 +5,14 @@ import { orchestrate } from '../core/orchestrator.js';
 import { acquireWorkspace } from '../host/workspace.js';
 import { runCommand } from '../host/process.js';
 import { ChildDisposalError, invokeChild, preflight } from './backend.js';
-import { parseConfig } from './config.js';
+import { registerSettings, configForRun } from './settings.js';
 
 export const name = 'smart-dev';
-export const inject = ['commands', 'subagents'];
+export const inject = ['commands', 'subagents', 'settings'];
 
 /** Human slash command: a fixed workflow, with no model-generated orchestration script. */
 export function apply(ctx: Context, raw: unknown): void {
-  const config = parseConfig(raw);
+  const settings = registerSettings(ctx, raw);
   const shutdown = new AbortController();
   const active = new Set<Promise<CommandResult>>();
   async function execute(invocation: CommandInvocation): Promise<CommandResult> {
@@ -20,6 +20,7 @@ export function apply(ctx: Context, raw: unknown): void {
     let runDir: string | undefined;
     let disposalFailed = false;
     try {
+      const config = configForRun(settings.get());
       const task = invocation.rawInput.trim();
       if (!task) throw new Error('Usage: /smart-dev <task>');
       const signal = AbortSignal.any([invocation.signal, shutdown.signal]);

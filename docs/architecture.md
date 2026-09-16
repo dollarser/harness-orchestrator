@@ -18,6 +18,16 @@ flowchart TD
 
 `/smart-dev` 是人类命令，不依赖模型生成 workflow 脚本。命令在父 Agent 的 `runMaintenance()` 中执行，已有活跃任务会拒绝占用，后续输入留在 inbox。其他会话或外部工具仍可能修改同一仓库，因此应使用独立 worktree。
 
+## 配置与 Web 扩展
+
+Host 依赖 `commands`、`subagents`、`settings`。`src/dsh/settings.ts` 注册 `smart-dev` namespace，以 overlay 为 base，复用 DSH 的 schema 校验、持久化和 revision 检查。原有完整 JSON 配置保持兼容；空配置允许插件加载并在页面完成设置，默认禁用。
+
+浏览器产物通过 `package.json` 的 `dsh.client` / `./client` 声明发布，以 DSH 要求的 lazy factory 加载。`src/client` 使用 `ctx.settingsScope` 和 `settings.section` 插槽，注册独立 Smart Dev 设置栏目；不新增 HTTP API、鉴权逻辑或前端服务。
+
+共享的纯配置校验放在 `src/shared`，浏览器不会导入 Node 文件系统模块。宿主是校验权威，页面检查只用于尽早反馈。页面保留草稿及读取时的 revision，拒绝无提示覆盖；收到保存响应后核对服务镜像才显示成功。状态目录只读，其值受 schema 常量约束。
+
+命令进入 maintenance 后读取当前设置并复制为本次运行的快照，产物 `config.json` 记录实际使用值；运行中的模型、预算和验证命令不随设置更新变化。设置范围和重置语义见 [配置页说明](configuration-page.md)。
+
 ## 状态与预算
 
 ```text

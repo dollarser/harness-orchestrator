@@ -3,7 +3,7 @@ import { join, dirname, resolve } from 'node:path';
 
 async function check(dir) {
   for (const item of await readdir(dir, { withFileTypes: true })) {
-    if (['.git', 'node_modules', 'dist'].includes(item.name)) continue;
+    if (['.git', 'node_modules', 'dist', 'test-results', 'playwright-report'].includes(item.name)) continue;
     const path = join(dir, item.name);
     if (item.isDirectory()) await check(path);
     else if (path.endsWith('.md')) {

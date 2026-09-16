@@ -1,6 +1,6 @@
 {
   "name": "@dollarser/dsh-smart-dev",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Deterministic coding orchestration as a DeepSeek Harness plugin",
   "type": "module",
   "license": "MIT",
@@ -12,6 +12,10 @@
     ".": {
       "types": "./dist/dsh/plugin.d.ts",
       "import": "./dist/dsh/plugin.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client.js"
     }
   },
   "main": "dist/dsh/plugin.js",
@@ -26,22 +30,45 @@
     "docs/validation.md",
     "docs/decisions",
     "legacy/python/README.md",
-    "scripts/create-overlay.mjs"
+    "scripts/create-overlay.mjs",
+    "docs/configuration-page.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/build-client.mjs",
     "test": "npm run build && node --test tests/*.test.mjs",
     "check": "npm test && node scripts/check-docs.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:ui": "npm run build && playwright test"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
     "@deepseek-ai/dsh-agent": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-client-ui-settings": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-client-ui-slots": "0.1.5-rc.1",
     "@deepseek-ai/dsh-commands": "0.1.5-rc.1",
     "@deepseek-ai/dsh-llm": "0.1.5-rc.1",
     "@deepseek-ai/dsh-session": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-settings": "0.1.5-rc.1",
     "@deepseek-ai/dsh-subagent": "0.1.5-rc.1",
+    "@playwright/test": "1.55.0",
     "@types/node": "^22.0.0",
+    "@types/react": "18.3.1",
+    "@types/react-dom": "18.3.0",
+    "esbuild": "0.25.9",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
     "typescript": "^5.9.0"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "3.18.2"
   }
 }
