@@ -2,6 +2,7 @@ import type { Context } from '@deepseek-ai/cordis';
 import type { Agent } from '@deepseek-ai/dsh-agent';
 import type {} from '@deepseek-ai/dsh-subagent';
 import type { AgentResult } from '../core/types.js';
+import { backendChoice } from '../shared/backends.js';
 import type { Config } from './config.js';
 
 export class ChildDisposalError extends Error {}
@@ -9,8 +10,8 @@ export class ChildDisposalError extends Error {}
 export function preflight(ctx: Pick<Context, 'subagents'>, config: Config): void {
   const provider = ctx.subagents.getProvider(config.workerProvider);
   if (!provider) throw new Error(`Missing subagent provider: ${config.workerProvider}`);
-  if (!provider.capabilities.agentOptions) throw new Error('Agent backend must support model selection');
-  if (config.workerToolAllow.length && !provider.capabilities.toolFilter)
+  if (backendChoice(config.workerProvider)?.dshModel && !provider.capabilities.agentOptions) throw new Error('Agent backend must support model selection');
+  if (backendChoice(config.workerProvider)?.dshModel && config.workerToolAllow.length && !provider.capabilities.toolFilter)
     throw new Error('Agent backend must support the configured tool filter');
 }
 
@@ -31,8 +32,10 @@ export async function invokeChild(ctx: Pick<Context, 'subagents'>, parent: Agent
     combined.throwIfAborted();
     run = await ctx.subagents.start(config.workerProvider, {
       parent, signal: combined, label: 'smart-dev agent', prompt: [{ type: 'text', text: prompt }],
-      agentOptions: config.workerModel,
-      ...(config.workerToolAllow.length ? { toolFilter: { allow: config.workerToolAllow } } : {}),
+      ...(backendChoice(config.workerProvider)?.dshModel ? {
+        agentOptions: config.workerModel,
+        ...(config.workerToolAllow.length ? { toolFilter: { allow: config.workerToolAllow } } : {}),
+      } : {}),
     });
     const result = await Promise.race([run.result, cancelled(combined)]);
     combined.throwIfAborted();

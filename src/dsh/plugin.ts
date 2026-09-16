@@ -2,9 +2,23 @@ import type { Context } from '@deepseek-ai/cordis';
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands';
 import type {} from '@deepseek-ai/dsh-subagent';
 import { orchestrate } from '../core/orchestrator.js';
+import type { WorkspaceRun } from '../host/workspace.js';
 import { acquireWorkspace } from '../host/workspace.js';
 import { ChildDisposalError, invokeChild, preflight } from './backend.js';
 import { registerSettings, configForRun } from './settings.js';
+
+/** Snapshots are useful evidence, never a prerequisite for Agent execution. */
+async function capture(lease: WorkspaceRun, label: string, signal: AbortSignal) {
+  try {
+    const evidence = await lease.evidence(signal);
+    const { patch, ...metadata } = evidence.kind === 'git' ? evidence : { ...evidence, patch: undefined };
+    await lease.save(`${label}.json`, metadata);
+    if (patch !== undefined) await lease.save(`${label}.patch`, patch);
+  } catch (error) {
+    signal.throwIfAborted();
+    await lease.save(`${label}.json`, { kind: 'unavailable', reason: String(error) });
+  }
+}
 
 export const name = 'smart-dev';
 export const inject = ['commands', 'subagents', 'settings'];
@@ -30,7 +44,7 @@ export function apply(ctx: Context, raw: unknown): void {
       lease = await acquireWorkspace(cwd, config.stateRoot, signal);
       runDir = lease.runDir;
       await lease.save('config.json', config);
-      await lease.save('before.patch', (await lease.evidence(signal)).patch);
+      await capture(lease, 'before', signal);
       const result = await orchestrate(task, {
         version: 2, runId: lease.runId, workspace: lease.workspace,
         stage: 'CREATED',
@@ -44,7 +58,7 @@ export function apply(ctx: Context, raw: unknown): void {
       }, signal);
       // Capture partial worker changes on failures/cancellation as well as on successful runs.
       if (!disposalFailed) {
-        try { await lease.save('last.patch', (await lease.evidence(AbortSignal.timeout(30_000))).patch); }
+        try { await capture(lease, 'last', AbortSignal.timeout(30_000)); }
         catch (error) { await lease.save('snapshot.error.txt', String(error)); }
       }
       return { kind: result.stage === 'FINISHED' ? 'success' : 'error',

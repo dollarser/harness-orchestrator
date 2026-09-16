@@ -11,11 +11,11 @@
 
 ## 当前实现
 
-- 原生 **Settings → Smart Dev**：选择模型、可选工具范围、超时和启用开关。
-- 默认使用 DSH `spawn`；一次任务交给一个执行 Agent。插件不强制调用 Codex，也不需要额外安装 Codex backend。
+- 原生 **Settings → Smart Dev**：选择 Backend、模型、可选工具范围、超时和启用开关。
+- Backend 下拉提供 spawn、fork、Codex、Claude Code 及用途说明；外部后端需安装，使用自己的模型与权限。一次 `/smart-dev` 任务交给一个选定后端。
 - 检查由 Agent 通过 DSH 工具自主执行；结果报告说明改动、实际检查、未完成事项和不确定性。
 - 工作区锁、父会话 maintenance、取消、超时、子 Agent 清理及仓库外运行记录。
-- 允许已有未提交改动，保存开始前后的 Git 差异，不自动 stash、重置或提交。
+- 普通目录、空目录和仓库子目录都可执行；Git 可用时记录差异，无 Git 时不强制初始化。
 - `FINISHED` 表示 Agent 正常返回，**不是插件独立验收通过**。
 - 有离线运行、真实 Git/进程、Cordis 生命周期和页面交互测试；尚未完成真实模型编码任务验收。
 
@@ -35,7 +35,7 @@ npm run test:ui
 
 ## 接入 DSH
 
-1. 在 DSH 中配置模型并选择目标 Git worktree 根目录。
+1. 在 DSH 中配置模型并选择目标目录或用于新建项目的父目录。
 2. 构建本项目，生成 overlay：`node scripts/create-overlay.mjs --configure /绝对路径/smart-dev.patch.yml`。
 3. 在 DSH 源码目录运行 `pnpm dsh web --patch /绝对路径/smart-dev.patch.yml`。
 4. 在 **Settings → Smart Dev** 选择模型、启用并保存。
@@ -62,4 +62,6 @@ Agent 决策质量取决于模型、上下文和工具。插件没有强制验�
 
 权限和嵌套委派由 DSH 管理；可选工具过滤只收窄可用工具，允许 shell 不构成文件系统或费用沙箱。锁只协调共享状态目录的本插件任务，不能阻止其他编辑器写入。
 
-当前仍需有 HEAD 的 Git 工作区，不提供自动续跑、自动 worktree 创建、完整嵌套 trace/费用汇总或自动回滚。详见 [架构](docs/architecture.md)。
+当前不要求 Git；不提供自动续跑、自动 worktree 创建、完整嵌套 trace/费用汇总或自动回滚。详见 [架构](docs/architecture.md)。
+
+主 DSH Agent 调用外部后端，需要安装后端并在实际 Agent 预设启用委派工具。可使用[分工指引](examples/delegation-guidance.md)，由模型自行决定是否请 Codex 规划、自己或 Claude Code 实现；见[配置步骤](docs/usage.md#主-dsh-agent-自主调度多个后端)。

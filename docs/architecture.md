@@ -29,7 +29,7 @@ CREATED → RUNNING → FINISHED
 
 ## 子 Agent
 
-默认 backend 为 spawn，只要求支持模型选择；只有用户配置了工具过滤时才要求 toolFilter 能力。空工具列表意味着不额外过滤，使用 DSH 暴露给该 Agent 的工具与权限。
+Backend 提供四个标准选项：spawn（独立上下文）、fork（继承已完成对话）、codex、claude-code。spawn/fork 要求模型选择能力；配置工具过滤时还要求 toolFilter。Codex/Claude Code 不发送 agentOptions、toolFilter 或 maxDepth，模型和权限由后端自身管理。外部后端是否安装在执行前检查，不用静态下拉框假装探测结果。
 
 插件不再强制 maxDepth=1，不禁止调用其他 Agent。能否委派、使用哪些工具，仍受宿主的工具配置、委派能力和深度限制约束。旧版本已保存的工具列表不会自动扩大。
 
@@ -37,19 +37,20 @@ CREATED → RUNNING → FINISHED
 
 ## 工作区和记录
 
-- 当前支持 macOS/Linux、有 HEAD 的 Git worktree 根目录。
+- 当前支持 macOS/Linux 的已有普通目录、空目录和 Git 子目录，不要求 Git 或首次提交。
 - 允许脏工作区，不自动 stage、stash、commit、reset；提示 Agent 保留已有工作。
 - `stateRoot` 必须解析到仓库外；符号链接通过真实路径规整。
-- 同一 workspace、同一 stateRoot 下的本插件任务通过目录锁串行化；其他程序不受此锁约束。
-- 开始前保存 `before.patch`；结束或失败后尽力保存 `last.patch`，快照失败写入 `snapshot.error.txt`。
-- 快照使用临时 Git index，不修改用户暂存区。两份 patch 各自相对于采集时 HEAD，可能包含先前改动；若 Agent 按用户请求提交了代码，需结合 Git 历史，不能把 last.patch 当作任务全部改动。
+- 已有仓库内的目录按仓库根路径共用锁；非 Git 目录按真实目录路径加锁。锁只约束同一 stateRoot 下的本插件任务；普通目录之间的父子重叠、运行中创建 Git 后改变锁边界及其他程序写入不由此锁完整覆盖。
+- 开始与结束时尽力记录 `before.json` / `last.json`。Git 可用时另存 patch；非 Git 或快照失败记录 unavailable 及原因，不阻止 Agent 执行。清理未确认成功时不采集可能仍在变动的最终快照。
+- 快照使用临时 Git index，不修改用户暂存区；无 HEAD 时以空树为基线，子目录只记录该目录内的改动。两份 patch 相对于各自采集时 HEAD（如有），可能包含先前改动。任务中新建 Git 可在结束时捕获；提交后的变化需结合 Git 历史。
 - 不自动回滚；崩溃遗留锁需要核对 owner.json、进程和子任务后人工处理。
 
 记录目录：
 
 ```text
 config.json / task.txt
-before.patch / last.patch
+before.json / last.json
+before.patch / last.patch      Git 可用时
 agent.prompt.txt / agent.result.json
 report.md                     正常返回的原始报告
 state.json / event-<n>.json
@@ -65,3 +66,7 @@ error.txt / snapshot.error.txt 按需生成
 配置变更只影响下次执行，stateRoot 仍只能通过部署修改，以免运行中更换锁目录。恢复默认值重置当前页面字段。
 
 设计决策见 [ADR-002](decisions/002-agent-owned-execution.md)。
+
+## 主会话与后端工具
+
+安装 backend 只注册宿主 provider，不自动赋予主 Agent 调用工具。主 Agent 所用预设必须启用对应 tool-subagent 条目，角色分工通过可选提示提供。普通聊天可以由主 Agent 自主调度；/smart-dev 仍将任务交给一个已选后端，不把主会话改成硬编码路由器。详见 [使用指南](usage.md)。

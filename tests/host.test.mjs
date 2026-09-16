@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, readFile, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm, symlink, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -67,4 +67,29 @@ test('host process timeout and cancellation stop processes', async () => {
   assert.equal((await runCommand(argv, tmpdir(), signal(), 30)).failure, 'timeout');
   const c = new AbortController(), pending = runCommand(argv, tmpdir(), c.signal, 5000);
   c.abort(); assert.equal((await pending).failure, 'cancelled');
+});
+
+test('ordinary directory runs without Git and can be initialized during the task', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'smart-dev-plain-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const cwd = join(root, 'project'); await mkdir(cwd);
+  const lease = await acquireWorkspace(cwd, join(root, 'state'), signal()); t.after(() => lease.release());
+  assert.equal((await lease.evidence(signal())).kind, 'unavailable');
+  await writeFile(join(cwd, 'new.txt'), 'new project');
+  execFileSync('git', ['init', '-q'], { cwd });
+  const snapshot = await lease.evidence(signal());
+  assert.equal(snapshot.kind, 'git'); assert.equal(snapshot.head, undefined);
+  assert.match(snapshot.patch, /new project/);
+  assert.equal(execFileSync('git', ['diff', '--cached'], { cwd, encoding: 'utf8' }), '');
+});
+test('Git subdirectories keep their cwd and share the repository lock', async t => {
+  const f = await repo(t), sub = join(f.cwd, 'module'); await mkdir(sub);
+  const lease = await acquireWorkspace(sub, f.state, signal()); t.after(() => lease.release());
+  assert.equal(lease.workspace, await realpath(sub));
+  await assert.rejects(acquireWorkspace(f.cwd, f.state, signal()), /locked/);
+  await writeFile(join(sub, 'inside.txt'), 'inside task');
+  await writeFile(join(f.cwd, 'outside.txt'), 'outside task');
+  const snapshot = await lease.evidence(signal());
+  assert.match(snapshot.patch, /inside task/); assert.doesNotMatch(snapshot.patch, /outside task/);
+  assert.equal(f.git('diff', '--cached'), '');
 });

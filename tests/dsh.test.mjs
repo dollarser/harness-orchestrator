@@ -102,3 +102,40 @@ test('child cleanup failure is surfaced so the caller retains the workspace lock
   } } };
   await assert.rejects(invokeChild(ctx, parent, config(), 'work', new AbortController().signal), ChildDisposalError);
 });
+
+test('native Codex and Claude backends receive no DSH-specific model or tool options', async () => {
+  for (const workerProvider of ['codex', 'claude-code']) {
+    const native = parseConfig({ workerProvider });
+    let request, selected;
+    const ctx = { subagents: {
+      getProvider: () => ({ capabilities: {} }),
+      async start(provider, req) { selected = provider; request = req; return { id: 'native', result: Promise.resolve(result), async dispose() {} }; },
+    } };
+    preflight(ctx, native);
+    await invokeChild(ctx, parent, { ...native, workerToolAllow: ['bash'] }, 'plan or implement', new AbortController().signal);
+    assert.equal(selected, workerProvider);
+    assert.equal(request.agentOptions, undefined); assert.equal(request.toolFilter, undefined); assert.equal(request.maxDepth, undefined);
+  }
+});
+test('slash command executes in a plain directory and records unavailable Git evidence', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'smart-dev-plain-plugin-')); t.after(() => rm(root, { recursive: true, force: true }));
+  const cwd = join(root, 'workspace'); await mkdir(cwd);
+  const ctx = new Context(); const settingsFiber = await ctx.plugin(MemorySettings); t.after(() => settingsFiber.dispose());
+  let command;
+  ctx.provide('commands', { register(def) { command = def; return () => {}; } });
+  ctx.provide('subagents', { getProvider: () => ({ capabilities: {} }), async start(provider, req) {
+    assert.equal(provider, 'codex'); assert.equal(req.parent.session.header.cwd, cwd);
+    await writeFile(join(cwd, 'new.txt'), 'done');
+    return { id: 'native', result: Promise.resolve(result), async dispose() {} };
+  } });
+  const fiber = await ctx.plugin(plugin, { workerProvider: 'codex', stateRoot: join(root, 'state') }); t.after(() => fiber.dispose());
+  const agent = { session: { header: { cwd } }, runMaintenance: work => work(signal()) };
+  function signal() { return new AbortController().signal; }
+  const response = await command.handler({ agent, rawInput: 'Create a project', signal: signal() });
+  assert.equal(response.kind, 'success');
+  const [id] = await readdir(join(root, 'state/runs'));
+  const before = JSON.parse(await readFile(join(root, 'state/runs', id, 'before.json'), 'utf8'));
+  const last = JSON.parse(await readFile(join(root, 'state/runs', id, 'last.json'), 'utf8'));
+  assert.equal(before.kind, 'unavailable'); assert.equal(last.kind, 'unavailable');
+  assert.equal(await readFile(join(cwd, 'new.txt'), 'utf8'), 'done');
+});

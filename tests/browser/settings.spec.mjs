@@ -103,3 +103,23 @@ test('desktop and narrow dark layout remain readable without horizontal overflow
   await page.getByRole('button', { name: '保存配置' }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: testInfo.outputPath('mobile-dark.png'), fullPage: true });
 });
+
+test('backend selector explains context and native model ownership', async ({ page }) => {
+  await page.goto('/');
+  const backend = page.getByLabel('执行 Backend', { exact: true });
+  await expect(backend.locator('option')).toHaveCount(4);
+  await backend.selectOption('fork');
+  await expect(page.getByText('从当前会话已完成的对话创建子 Agent', { exact: false })).toBeVisible();
+  await expect(page.getByLabel('模型', { exact: true })).toBeVisible();
+  await backend.selectOption('codex');
+  await expect(page.getByText('通过 DSH 的 Codex 后端执行任务', { exact: false })).toBeVisible();
+  await expect(page.getByLabel('模型', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('工具范围（可选）', { exact: false })).toHaveCount(0);
+  await page.getByRole('button', { name: '保存配置' }).click();
+  await expect(page.getByRole('status')).toHaveText('已保存到 DSH，从下一次任务生效。');
+  await page.reload(); await expect(backend).toHaveValue('codex');
+  await backend.selectOption('claude-code');
+  await expect(page.getByText('通过 DSH 的 Claude Code 后端执行任务', { exact: false })).toBeVisible();
+  await backend.selectOption('spawn');
+  await expect(page.getByLabel('模型', { exact: true })).toHaveValue('qwen3-coder');
+});

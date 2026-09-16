@@ -3,6 +3,7 @@ import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client';
 import type { Settings } from '../shared/config.js';
 import { editableKeys, fromDraft, same, toDraft } from './editor.js';
 import type { Draft } from './editor.js';
+import { backendChoice, backends } from '../shared/backends.js';
 import { styles } from './styles.js';
 import { ModelFields } from './ModelFields.js';
 import type { LoadModelCatalog } from './ModelFields.js';
@@ -21,6 +22,7 @@ export function SettingsPage({ scope, loadCatalog }: Props) {
       setBase(snapshot); setDraft(toDraft(snapshot.value));
     }
   }, [snapshot, dirty, busy]);
+  const backend = backendChoice(draft?.workerProvider ?? '');
   const ready = snapshot.status === 'ready' && snapshot.value && draft && base.value;
   const writable = snapshot.writable && snapshot.mode === 'host';
   const stale = dirty && snapshot.revision !== base.revision;
@@ -70,14 +72,21 @@ export function SettingsPage({ scope, loadCatalog }: Props) {
       <fieldset disabled={!writable || busy} className="sd-fields">
         <label className="sd-enable"><span><strong>启用 Smart Dev</strong><small>保存后用于新任务；正在运行的任务继续使用原配置。</small></span>
           <input type="checkbox" role="switch" checked={draft.enabled} onChange={e => edit('enabled', e.target.checked)} /></label>
-        <section className="sd-card"><h3>模型与执行</h3><p>从 DSH 模型目录选择执行模型。模型连接与凭据在 Settings → Models 管理。</p>
-          <div className="sd-grid">{textField('workerProvider', '执行 Backend', '默认 spawn；使用 DSH Agent 执行任务，后端需支持模型选择。')}
-            <ModelFields provider={draft.modelProvider} model={draft.model} loadCatalog={loadCatalog}
+        <section className="sd-card"><h3>执行方式与模型</h3>
+          <label className="sd-field">执行 Backend
+            <select aria-label="执行 Backend" value={draft.workerProvider} onChange={event => edit('workerProvider', event.target.value)}>
+              {!backend && <option value={draft.workerProvider}>{draft.workerProvider || '请选择后端'}</option>}
+              {backends.map(item => <option key={item.id} value={item.id}>{item.title} ({item.id})</option>)}
+            </select>
+            <small>{backend?.description ?? '请选择执行后端。'}</small>
+          </label>
+          <p>列出标准后端选项；是否已安装、认证及可运行会在启动时由宿主检查。</p>
+          {backend?.dshModel ? <><div className="sd-grid"><ModelFields provider={draft.modelProvider} model={draft.model} loadCatalog={loadCatalog}
               onChange={(modelProvider, model) => {
                 setDraft(current => current ? { ...current, modelProvider, model } : current);
                 setDirty(true); setNotice(undefined);
               }} /></div>
-          <label className="sd-field">工具范围（可选）<textarea rows={3} value={draft.tools} spellCheck={false} onChange={e => edit('tools', e.target.value)} /><small>留空继承 DSH 可用工具与权限；填写时每行一个工具名，进一步收窄范围。</small></label>
+          <label className="sd-field">工具范围（可选）<textarea rows={3} value={draft.tools} spellCheck={false} onChange={e => edit('tools', e.target.value)} /><small>留空继承 DSH 可用工具与权限；填写时每行一个工具名，进一步收窄范围。</small></label></> : <p className="sd-note">此后端使用自己的模型和工具配置，DSH 模型选择与工具范围不应用于它。</p>}
         </section>
         <section className="sd-card"><h3>执行方式</h3>
           <p>Agent 根据任务和项目决定是否规划、运行测试或构建、修复以及追加审查，无需预设验证命令或修复轮次。结果报告会说明实际完成的工作、检查和未解决的问题。</p>

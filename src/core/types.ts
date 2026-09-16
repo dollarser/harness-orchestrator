@@ -15,7 +15,8 @@ export interface Verification {
   durationMs: number;
   failure?: string;
 }
-export interface Evidence { patch: string; fingerprint: string }
+export type Evidence = { kind: 'git'; patch: string; fingerprint: string; root: string; head?: string }
+  | { kind: 'unavailable'; reason: string };
 /** FINISHED describes the child lifecycle; the Agent's report describes task outcomes. */
 export interface State {
   version: 2;
