@@ -30,36 +30,19 @@ npm ci
 npm pack
 ```
 
-这会自动构建并生成 `dollarser-dsh-smart-dev-0.9.0.tgz`。记下该文件的完整路径，例如 `/Users/你的用户名/harness-orchestrator/dollarser-dsh-smart-dev-0.9.0.tgz`。
+这会自动构建并生成 `dollarser-dsh-smart-dev-0.10.0.tgz`。记下该文件的完整路径，例如 `/Users/你的用户名/harness-orchestrator/dollarser-dsh-smart-dev-0.10.0.tgz`。
 
 ### 2. 安装到 DSH
 
 进入你平时运行 `pnpm dsh web` 的 DSH 源码目录，执行以下命令，将路径替换为上一步生成的文件：
 
 ```sh
-pnpm dsh plugin --profile web add /完整路径/dollarser-dsh-smart-dev-0.9.0.tgz
+pnpm dsh plugin --profile web add /完整路径/dollarser-dsh-smart-dev-0.10.0.tgz
 ```
 
-### 3. 添加启动配置
+安装命令会自动登记插件自带的启动配置，无需编辑 YAML 或填写插件入口路径。如果你使用其他 Profile，请将命令中的 `web` 改为对应名称。
 
-打开 `web` Profile 中的 `cordis.patch.yml`。默认位置是：
-
-```text
-~/.dsh/profiles/web/cordis.patch.yml
-```
-
-在已有配置末尾追加以下内容；如果文件不存在，新建它。将 `name` 改成你机器上的**完整绝对路径**，不要使用 `~`：
-
-```yaml
-- insert:
-    - id: smart-dev
-      name: '/Users/你的用户名/.dsh/profiles/web/node_modules/@dollarser/dsh-smart-dev/dist/dsh/plugin.js'
-      config: {}
-```
-
-如果你自定义了 `DSH_HOME` 或使用其他 Profile，请相应调整文件位置、插件路径以及安装命令中的 `web`。已有 `smart-dev` 条目时修改原条目，不要重复添加。
-
-### 4. 重启 DSH
+### 3. 重启 DSH
 
 在启动 DSH 的终端按 `Ctrl+C` 停止服务，然后重新运行：
 
@@ -118,7 +101,7 @@ claude auth login
 
 | 问题 | 怎么处理 |
 |---|---|
-| 设置中没有 Smart Dev | 检查安装路径、`cordis.patch.yml` 中的启动配置，并重启 DSH |
+| 设置中没有 Smart Dev | 确认安装到启动时使用的 Profile，并重启 DSH |
 | 已安装，但显示“未注册” | 重启 DSH 服务，而不只是刷新网页 |
 | 显示已启用，但对话没有工具 | 确认对话使用的是所配置的预设；重启后刷新状态 |
 | 创建了协作版，但当前会话没变化 | 新建会话，在模式选择器中选择协作版 |

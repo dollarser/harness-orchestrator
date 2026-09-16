@@ -50,3 +50,10 @@
 5. 通过页面重新启用两个工具并重启，恢复原有使用状态。
 
 结论：在上述宿主版本中，安装后端和修改已加载预设的工具开关均需要重启 DSH 服务；刷新网页不足以生效。禁用只影响所选预设，不卸载后端包，也不表示取消正在执行的任务。此次未发送真实模型任务。
+
+## 0.10.0 原生 Bundle 安装
+
+- `npm run check` 的 20 项 Node/Host 测试及文档检查通过；打包产物包含 `cordis.patch.yml` 与 `dsh.bundle.patch` 声明。
+- 本机通过 `pnpm dsh plugin --profile web add <0.10.0 安装包>` 实际安装，DSH 自动在 Profile 的 Bundle 列表登记 `@dollarser/dsh-smart-dev`。
+- 备份后移除本机先前手写的 Smart Dev Host 入口，保留其他配置；重启 DSH 0.1.6-alpha.1 后，Smart Dev 页面成功请求状态，两个后端均已注册，self-search 的两个工具均可见。
+- 此次验证的是 Bundle 安装与 Host 加载，不包含真实模型任务调用。

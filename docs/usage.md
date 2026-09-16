@@ -33,8 +33,7 @@
 
 1. 为相关预设关闭分工指引。
 2. 如需撤销插件启用的工具，点击“还原本插件对预设的修改”。没有管理记录的原有工具不会被禁用。
-3. 从 Profile 的 `cordis.patch.yml` 移除 `smart-dev` Host 入口。
-4. 通过 `dsh plugin --profile web remove @dollarser/dsh-smart-dev` 删除包，重启 DSH。
+3. 在 DSH 源码目录执行 `pnpm dsh plugin --profile web remove @dollarser/dsh-smart-dev`，自动移除包及其 Bundle 登记，然后重启 DSH。
 
 Codex / Claude Code 后端包和原本启用的工具继续保留。`.smart-dev` 下的本地记录可以按需保留；移除插件本身即停止运行时提示词注入。
 

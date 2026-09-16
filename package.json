@@ -1,6 +1,6 @@
 {
   "name": "@dollarser/dsh-smart-dev",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Native DSH multi-agent setup, diagnostics and optional delegation guidance",
   "type": "module",
   "license": "MIT",
@@ -26,7 +26,8 @@
     "LICENSE",
     "docs",
     "examples",
-    "scripts/create-overlay.mjs"
+    "scripts/create-overlay.mjs",
+    "cordis.patch.yml"
   ],
   "scripts": {
     "build": "node scripts/clean-build.mjs && tsc -p tsconfig.json && node scripts/build-client.mjs",
@@ -65,6 +66,9 @@
         "@deepseek-ai/dsh-client-ui-settings",
         "@deepseek-ai/dsh-client-connection"
       ]
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
     }
   },
   "dependencies": {

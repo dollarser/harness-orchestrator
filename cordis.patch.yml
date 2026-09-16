@@ -1,0 +1,4 @@
+# Register Smart Dev on the Host; tool selection remains in the settings page.
+- insert:
+    - id: smart-dev
+      name: '@dollarser/dsh-smart-dev'

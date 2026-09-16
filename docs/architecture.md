@@ -28,6 +28,8 @@ CLI 登录检测只检查标准 CLI 的账户状态。不证明用户自定义�
 
 ## 安装和配置修改
 
+Smart Dev 包通过 `dsh.bundle.patch` 声明随包分发的 `cordis.patch.yml`，其中以包名挂载 Host 插件。DSH 的 `plugin add` 自动登记 Bundle，`plugin remove` 移除登记；用户无需手写入口或绝对路径。Web 配置页继续通过 `dsh.client` 声明。
+
 安装操作只接受 Codex / Claude Code 两个固定包名，首次安装固定 `0.1.5-rc.1`，不升级已存在的版本。使用 Profile 内 `pnpm add --save-exact`，遵循用户已有 pnpm 供应链设置。插件不放宽构建脚本、权限或后端 sandbox 配置。
 
 一键安装启用先校验目标预设，再安装、注册 Bundle、启用工具。安装成功但启用失败会报告部分完成；包管理不是原子事务，不自动覆盖回滚 pnpm 可能写入的文件。备份可供手工恢复。
