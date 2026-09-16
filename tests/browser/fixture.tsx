@@ -5,9 +5,9 @@ import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-clie
 import type { Settings } from '../../src/shared/config.js';
 import type { ModelCatalog } from '@deepseek-ai/dsh-api-remotes/client';
 
-const initial: Settings = { enabled: true, plannerProvider: 'codex', reviewerProvider: 'codex', workerProvider: 'spawn',
-  workerModel: { provider: 'local', model: 'qwen3-coder' }, workerToolAllow: ['bash'], verifyCommands: [['npm', 'test']],
-  maxStrongCalls: 2, maxFixRounds: 1, agentTimeoutMs: 1_800_000, commandTimeoutMs: 600_000, stateRoot: '/example/state/harness-orchestrator' };
+const initial: Settings = { enabled: true, workerProvider: 'spawn',
+  workerModel: { provider: 'local', model: 'qwen3-coder' }, workerToolAllow: [],
+  agentTimeoutMs: 1_800_000, stateRoot: '/example/state/harness-orchestrator' };
 const params = new URLSearchParams(location.search);
 let snapshot: SettingsScopeSnapshot<Settings> = { status: 'ready', value: structuredClone(initial), base: initial,
   user: {}, revision: 1, writable: true, mode: 'host', ...JSON.parse(localStorage.getItem('fixture') ?? '{}') };
@@ -50,5 +50,5 @@ const scope: SettingsScope<Settings> = {
   },
   set: async () => { throw new Error('Use atomic mutation'); }, unset: async () => { throw new Error('Use atomic mutation'); },
 };
-Object.assign(window, { fixture: { remoteChange() { publish({ ...snapshot, value: { ...snapshot.value!, maxStrongCalls: 5 }, revision: snapshot.revision! + 1 }); }, writes: () => writes } });
+Object.assign(window, { fixture: { remoteChange() { publish({ ...snapshot, value: { ...snapshot.value!, agentTimeoutMs: 5000 }, revision: snapshot.revision! + 1 }); }, writes: () => writes } });
 createRoot(document.getElementById('root')!).render(<SettingsPage scope={scope} loadCatalog={loadCatalog} />);

@@ -23,15 +23,10 @@ export function registerSettings(ctx: Context, raw: unknown): SettingsScope<Sett
   const timer = (fallback: number) => Schema.number().step(1).min(1).max(2_147_483_647).default(fallback);
   const schema = Schema.object({
     enabled: Schema.boolean().default(false),
-    plannerProvider: Schema.string().default('codex'),
-    reviewerProvider: Schema.string().default('codex'),
     workerProvider: Schema.string().default('spawn'),
     workerModel: Schema.object({ provider: Schema.string().default(''), model: Schema.string().default('') }),
-    workerToolAllow: Schema.array(Schema.string()).default(['bash']),
-    verifyCommands: Schema.array(Schema.array(Schema.string())).default([]),
-    maxStrongCalls: Schema.number().step(1).min(2).max(100).default(2),
-    maxFixRounds: Schema.number().step(1).min(0).max(10).default(1),
-    agentTimeoutMs: timer(1_800_000), commandTimeoutMs: timer(600_000),
+    workerToolAllow: Schema.array(Schema.string()).default([]),
+    agentTimeoutMs: timer(1_800_000),
     // Changing this while a workflow holds a lock could permit a competing run.
     stateRoot: Schema.const(stateRoot).default(stateRoot),
   });

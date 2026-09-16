@@ -59,8 +59,6 @@ export async function acquireWorkspace(cwd: string, stateRoot: string, signal: A
     signal.throwIfAborted();
     await writeFile(join(lock, 'owner.json'), JSON.stringify({ pid: process.pid, workspace, runId }), { mode: 0o600 });
     await git(workspace, ['rev-parse', '--verify', 'HEAD'], signal);
-    if ((await git(workspace, ['status', '--porcelain=v1', '--untracked-files=all'], signal)).trim())
-      throw new Error('Workspace is dirty; use a clean isolated worktree');
     await mkdir(runDir, { recursive: true, mode: 0o700 });
     const save = async (name: string, value: unknown) => {
       if (!/^[a-zA-Z0-9_.-]+$/u.test(name)) throw new Error('Invalid artifact filename');

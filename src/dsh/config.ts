@@ -9,10 +9,9 @@ export function parseConfig(raw: unknown): Config {
   const value = raw as Record<string, unknown>;
   for (const key of Object.keys(value)) if (!configKeys.includes(key)) throw new Error(`Unknown smart-dev setting: ${key}`);
   const config = {
-    plannerProvider: 'codex', reviewerProvider: 'codex', workerProvider: 'spawn',
-    maxStrongCalls: 2, maxFixRounds: 1,
+    workerProvider: 'spawn', workerToolAllow: [], workerModel: { provider: '', model: '' },
     stateRoot: join(process.env.XDG_STATE_HOME || join(homedir(), '.local', 'state'), 'harness-orchestrator'),
-    agentTimeoutMs: 1_800_000, commandTimeoutMs: 600_000,
+    agentTimeoutMs: 1_800_000,
     ...value,
   } as Config;
   validateConfig(config);

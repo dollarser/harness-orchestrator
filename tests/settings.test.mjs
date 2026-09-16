@@ -15,14 +15,14 @@ async function fixture(t, raw) {
   t.after(async () => { await fiber.dispose(); await settingsFiber.dispose(); });
   return { ctx, scope, fiber };
 }
-const configured = { workerModel: { provider: 'local', model: 'model-a' }, workerToolAllow: ['bash'], verifyCommands: [['npm', 'test']] };
+const configured = { workerModel: { provider: 'local', model: 'model-a' }, workerToolAllow: ['bash'] };
 test('first install exposes disabled settings; enabled saves validate before persistence', async t => {
   const { ctx, scope, fiber } = await fixture(t, {});
   assert.equal(scope.get().enabled, false);
   assert.throws(() => configForRun(scope.get()), /Settings → Smart Dev/);
   await assert.rejects(scope.update({ bogus: true }), /Unknown/);
   await assert.rejects(scope.update({ workerModel: { bogus: true } }), /Unknown/);
-  await assert.rejects(scope.update({ enabled: true }), /verifyCommands|workerModel/);
+  await assert.rejects(scope.update({ enabled: true }), /workerModel/);
   assert.equal(ctx.settings.writes, 0);
   await scope.update({ ...configured, enabled: true });
   assert.equal(configForRun(scope.get()).workerModel.model, 'model-a');
@@ -34,26 +34,30 @@ test('native revisions prevent stale saves; resets inherit composition; runs own
   const old = configForRun(scope.get()), rev = ctx.settings.describe()[0].revision;
   await ctx.settings.mutate('smart-dev', [{ op: 'set', path: ['workerModel', 'model'], value: 'model-b' }], rev);
   assert.equal(old.workerModel.model, 'model-a'); assert.equal(configForRun(scope.get()).workerModel.model, 'model-b');
-  await assert.rejects(ctx.settings.update('smart-dev', { maxStrongCalls: 3 }, rev), /revision|changed|conflict/i);
-  assert.equal(scope.get().maxStrongCalls, 2);
+  await assert.rejects(ctx.settings.update('smart-dev', { agentTimeoutMs: 3000 }, rev), /revision|changed|conflict/i);
+  assert.equal(scope.get().agentTimeoutMs, 1_800_000);
   await scope.replace({}); assert.equal(scope.get().workerModel.model, 'model-a');
 });
 test('Host rejects invalid limits, unknown enabled config and lock directory changes', async t => {
   const { ctx, scope } = await fixture(t, configured);
-  for (const patch of [{ maxStrongCalls: 1 }, { maxFixRounds: 0.5 }, { verifyCommands: [] }, { agentTimeoutMs: 0 },
-    { workerProvider: 'codex' }, { workerToolAllow: [] }, { workerModel: { model: '' } }, { bogus: true }, { stateRoot: '/tmp/other-locks' }]) {
+  for (const patch of [{ agentTimeoutMs: 0 }, { agentTimeoutMs: 0.5 },
+    { workerToolAllow: [''] }, { workerModel: { model: '' } }, { bogus: true }, { stateRoot: '/tmp/other-locks' }]) {
     await assert.rejects(scope.update(patch), undefined, JSON.stringify(patch));
   }
   assert.equal(ctx.settings.writes, 0);
 });
-test('editor preserves argv boundaries and rejects invalid JSON, empty model and fractional limits', async t => {
+test('editor allows inherited tools and rejects missing model or invalid timeout', async t => {
   const { scope } = await fixture(t, configured);
-  const draft = toDraft(scope.get());
-  draft.commands = JSON.stringify([['node', '-e', 'console.log("hello world")']]);
-  assert.equal(fromDraft(draft, scope.get().stateRoot).verifyCommands[0][2], 'console.log("hello world")');
-  assert.throws(() => fromDraft({ ...draft, commands: 'npm test' }, '/tmp/state'), /JSON/);
+  const draft = { ...toDraft(scope.get()), tools: '' };
+  assert.deepEqual(fromDraft(draft, scope.get().stateRoot).workerToolAllow, []);
   assert.throws(() => fromDraft({ ...draft, model: '' }, '/tmp/state'), /workerModel/);
-  assert.throws(() => fromDraft({ ...draft, maxFixRounds: '0.5' }, '/tmp/state'), /整数/);
+  assert.throws(() => fromDraft({ ...draft, agentTimeoutMs: '0.5' }, '/tmp/state'), /整数/);
+});
+test('removed workflow fields cannot be saved even while disabled', async t => {
+  const { ctx, scope } = await fixture(t, {});
+  for (const key of ['plannerProvider', 'reviewerProvider', 'verifyCommands', 'maxStrongCalls', 'maxFixRounds', 'commandTimeoutMs'])
+    await assert.rejects(scope.update({ [key]: 1 }), /Unknown/);
+  assert.equal(ctx.settings.writes, 0);
 });
 test('browser artifact registers a lazy DSH factory and contributes the native section', async () => {
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));

@@ -1,66 +1,65 @@
 # harness-orchestrator
 
-**DeepSeek Harness 原生编排插件**：通过 `/smart-dev <task>` 执行固定的编码工作流。
+**DeepSeek Harness 原生任务插件**：输入 `/smart-dev <task>`，由执行 Agent 自主决定如何完成任务。
 
 ```text
-Codex 规划 → DSH 本地 Worker → 确定性验证 → Codex 审查
-                                  ↑           │
-                                  └── 本地修复 ←┘
+用户任务 → DSH 执行 Agent → 工作结果与运行记录
+              自主选择规划、检查、修复和审查
 ```
 
-DSH 提供命令入口、父会话和子 Agent；插件代码负责状态机、预算、验证和产物。父模型无需额外推理来决定下一阶段。
+从 0.4.0 起，不再用代码强制规划、执行、验证、审查的顺序，也不要求预先填写验证命令或限制修复轮次。Agent 根据任务、项目说明和实际结果决策；插件负责运行保障。
 
 ## 当前实现
 
-- 原生 **Settings → Smart Dev** 配置页：编辑模型、工具、预算和验证命令，保存后从下一次任务生效。
-- TypeScript 插件，包名 `@dollarser/dsh-smart-dev`。
-- 默认 Worker 使用 DSH `spawn`，必须显式配置模型和工具列表。
-- 默认强模型预算 **2 次**：规划＋首次审查。修复后重新验证，预算不足返回 `NEEDS_REVIEW`；配置 3 次才允许一次修复后的复核。
-- 没有验证命令、异常或空 Agent 输出、格式错误的计划/审查都不能产生 `DONE`。
-- 使用干净的独立 Git worktree；产物放在仓库外，工作区锁串行化使用同一状态目录的插件任务。
-- 有离线状态机、真实 Git/进程和 Cordis 加载测试。**尚未完成真实 Codex＋本地模型端到端验收。**
+- 原生 **Settings → Smart Dev**：选择模型、可选工具范围、超时和启用开关。
+- 默认使用 DSH `spawn`；一次任务交给一个执行 Agent。插件不强制调用 Codex，也不需要额外安装 Codex backend。
+- 检查由 Agent 通过 DSH 工具自主执行；结果报告说明改动、实际检查、未完成事项和不确定性。
+- 工作区锁、父会话 maintenance、取消、超时、子 Agent 清理及仓库外运行记录。
+- 允许已有未提交改动，保存开始前后的 Git 差异，不自动 stash、重置或提交。
+- `FINISHED` 表示 Agent 正常返回，**不是插件独立验收通过**。
+- 有离线运行、真实 Git/进程、Cordis 生命周期和页面交互测试；尚未完成真实模型编码任务验收。
 
-主实现对应原设计的**路线 A：DSH 作为总控**。原独立 Python CLI 已归档到 [legacy/python](legacy/python/README.md)，不再是主入口。
+DSH 仍是运行宿主。旧固定流程被 [ADR-002](docs/decisions/002-agent-owned-execution.md) 替代，原 Python CLI 留在 [legacy/python](legacy/python/README.md)。
 
-## 开发与检查
+## 开发
 
-Node.js 22+、macOS/Linux、Git；DSH 宿主自身要求以其发行版为准。
+Node.js 22+、macOS/Linux、Git；DSH 自身要求以使用版本为准。
 
 ```bash
 npm ci
 npm run check
+npm run test:ui
 ```
 
-开发类型依赖固定为 DSH `0.1.5-rc.1`，Cordis `4.0.2`。Host 使用宿主提供的服务；浏览器页面使用 DSH 设置页插槽和设置持久化接口。见 [验证记录](docs/validation.md)。
+开发类型固定为 DSH `0.1.5-rc.1`、Cordis `4.0.2`，使用宿主服务，不捆绑第二套 DSH 运行时。见 [验证记录](docs/validation.md)。
 
-## 安装到 DSH
+## 接入 DSH
 
-1. 构建本项目，安装 DSH 的 Codex subagent bundle。
-2. 在 DSH 配置实际可用的本地模型，选择干净的目标 Git worktree 根目录。
-3. 生成初始 overlay：`node scripts/create-overlay.mjs --configure /绝对路径/smart-dev.patch.yml`。
-4. 在 DSH 源码目录执行 `pnpm dsh web --patch /绝对路径/smart-dev.patch.yml`。
-5. 打开 **Settings → Smart Dev**，填写模型与验收命令、启用并保存，然后输入 `/smart-dev <task>`。
+1. 在 DSH 中配置模型并选择目标 Git worktree 根目录。
+2. 构建本项目，生成 overlay：`node scripts/create-overlay.mjs --configure /绝对路径/smart-dev.patch.yml`。
+3. 在 DSH 源码目录运行 `pnpm dsh web --patch /绝对路径/smart-dev.patch.yml`。
+4. 在 **Settings → Smart Dev** 选择模型、启用并保存。
+5. 输入 `/smart-dev <task>`。
 
-完整命令见 [使用指南](docs/usage.md)，页面行为见 [配置页说明](docs/configuration-page.md)。仍支持从 [config.json 样例](examples/config.json) 生成预配置 overlay；示例模型 ID 必须替换。
+详见 [使用指南](docs/usage.md)、[配置页](docs/configuration-page.md) 和 [配置样例](examples/config.json)。
 
 ## 代码结构
 
 ```text
-src/core/       状态机、提示词、产物校验；不依赖 DSH
-src/dsh/        命令注册、原生设置服务、subagent 适配
-src/client/     Settings → Smart Dev 页面、草稿校验、浏览器插件入口
-src/shared/     Host 与浏览器共享的配置类型和校验
-src/host/       Git 证据、工作区锁、原子产物写入、验证进程
-tests/         状态机、适配器、Cordis 生命周期与 Git/进程测试
-examples/      配置样例
-docs/          当前架构、使用说明、决策与验证边界
-legacy/python/ 原 Python 外部编排原型
+src/core/       任务提示与运行生命周期，不依赖 DSH
+src/dsh/        命令、设置、子 Agent 适配与清理
+src/client/     原生设置页与模型选择
+src/shared/     配置类型与校验
+src/host/       工作区锁、Git 快照、原子文件和进程管理
+tests/         运行保障、宿主集成与页面测试
+docs/          当前设计、使用说明、决策和验证边界
+legacy/python/ 原外部编排原型
 ```
 
 ## 边界
 
-预算计量规划/审查的启动次数，不是 token、费用或全部嵌套调用。工具 allowlist 和委派深度收窄 Worker 调用路径，但允许 shell 就不能声称拥有全局费用沙箱。
+Agent 决策质量取决于模型、上下文和工具。插件没有强制验收门槛、费用预算或独立 Reviewer；不能把正常返回等同于任务已经完成。
 
-规划/审查的只读约束是提示词加 Git 状态变化检测，**不是操作系统级禁止写入**。各原生 Harness 仍使用自己的权限配置。插件不自动回滚、提交或推送目标项目。
+权限和嵌套委派由 DSH 管理；可选工具过滤只收窄可用工具，允许 shell 不构成文件系统或费用沙箱。锁只协调共享状态目录的本插件任务，不能阻止其他编辑器写入。
 
-没有自动续跑、跨状态目录的分布式锁、完整后端 trace/usage 汇总、自动 worktree 创建或 Claude Code Worker 适配。见 [架构](docs/architecture.md) 和 [ADR-001](docs/decisions/001-dsh-plugin.md)。
+当前仍需有 HEAD 的 Git 工作区，不提供自动续跑、自动 worktree 创建、完整嵌套 trace/费用汇总或自动回滚。详见 [架构](docs/architecture.md)。

@@ -3,14 +3,13 @@ import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands
 import type {} from '@deepseek-ai/dsh-subagent';
 import { orchestrate } from '../core/orchestrator.js';
 import { acquireWorkspace } from '../host/workspace.js';
-import { runCommand } from '../host/process.js';
 import { ChildDisposalError, invokeChild, preflight } from './backend.js';
 import { registerSettings, configForRun } from './settings.js';
 
 export const name = 'smart-dev';
 export const inject = ['commands', 'subagents', 'settings'];
 
-/** Human slash command: a fixed workflow, with no model-generated orchestration script. */
+/** Human slash command: Agent-owned execution with host lifecycle safeguards. */
 export function apply(ctx: Context, raw: unknown): void {
   const settings = registerSettings(ctx, raw);
   const shutdown = new AbortController();
@@ -31,16 +30,16 @@ export function apply(ctx: Context, raw: unknown): void {
       lease = await acquireWorkspace(cwd, config.stateRoot, signal);
       runDir = lease.runDir;
       await lease.save('config.json', config);
+      await lease.save('before.patch', (await lease.evidence(signal)).patch);
       const result = await orchestrate(task, {
-        version: 1, runId: lease.runId, workspace: lease.workspace,
-        stage: 'CREATED', strongCalls: 0, fixRounds: 0,
-      }, config, {
-        invoke: async (role, prompt, childSignal) => {
-          try { return await invokeChild(ctx, invocation.agent, config, role, prompt, childSignal); }
+        version: 2, runId: lease.runId, workspace: lease.workspace,
+        stage: 'CREATED',
+      }, {
+        invoke: async (prompt, childSignal) => {
+          try { return await invokeChild(ctx, invocation.agent, config, prompt, childSignal); }
           catch (error) { if (error instanceof ChildDisposalError) disposalFailed = true; throw error; }
         },
-        verify: (argv, checkSignal) => runCommand(argv, lease!.workspace, checkSignal, config.commandTimeoutMs),
-        save: lease.save, evidence: lease.evidence,
+        save: lease.save,
         progress: state => ctx.logger.info(`smart-dev ${state.runId}: ${state.stage}`),
       }, signal);
       // Capture partial worker changes on failures/cancellation as well as on successful runs.
@@ -48,8 +47,8 @@ export function apply(ctx: Context, raw: unknown): void {
         try { await lease.save('last.patch', (await lease.evidence(AbortSignal.timeout(30_000))).patch); }
         catch (error) { await lease.save('snapshot.error.txt', String(error)); }
       }
-      return { kind: result.stage === 'DONE' ? 'success' : 'error',
-        text: `${result.stage}: ${result.message ?? 'Task verified and reviewed'}\nArtifacts: ${runDir}\nStrong calls: ${result.strongCalls}; fixes: ${result.fixRounds}` };
+      return { kind: result.stage === 'FINISHED' ? 'success' : 'error',
+        text: `${result.stage}: ${result.message ?? ''}\nArtifacts: ${runDir}` };
     } catch (error) {
       return { kind: 'error', text: `${String(error)}${runDir ? `\nArtifacts: ${runDir}` : ''}` };
     } finally {
@@ -59,7 +58,7 @@ export function apply(ctx: Context, raw: unknown): void {
   ctx.effect(function* () {
     yield async () => { shutdown.abort(new Error('smart-dev unloaded')); await Promise.allSettled(active); };
     yield ctx.commands.register({
-      name: 'smart-dev', description: 'Plan, implement, verify and review one coding task',
+      name: 'smart-dev', description: 'Delegate a coding task to an autonomous Agent',
       input: { hint: 'Describe the task and acceptance criteria' },
       handler(invocation) {
         // Keep the parent quiescent; queued UI prompts wake only after the workflow settles.

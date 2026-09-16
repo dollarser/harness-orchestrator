@@ -57,7 +57,7 @@ export function ModelFields({ provider, model, loadCatalog, onChange }: Props) {
           {missingModel && <option value={model}>{model}（当前未列出，保留原值）</option>}
           {group?.models.map(entry => <option key={entry.id} value={entry.id}>{label(entry.id, entry.name)}</option>)}
         </select>
-        <small>用于执行和修复代码的 Worker；规划和审查使用上方 Provider。</small>
+        <small>执行此任务的 Agent 使用该模型，自行决定工作步骤。</small>
       </label>
     </div>
     <button type="button" className="sd-refresh" disabled={loading} onClick={refresh}>刷新模型列表</button>

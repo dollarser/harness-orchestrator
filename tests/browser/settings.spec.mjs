@@ -18,7 +18,7 @@ test('unknown saved route survives catalog refresh and unrelated edits', async (
   await page.getByRole('button', { name: '刷新模型列表' }).click();
   await expect(page.getByLabel('模型 Provider', { exact: true })).toHaveValue('removed');
   await expect(page.getByLabel('模型', { exact: true })).toHaveValue('old-model');
-  await page.getByLabel('强模型调用上限').fill('3');
+  await page.getByLabel('任务超时（毫秒）').fill('3000');
   await page.getByRole('button', { name: '保存配置' }).click();
   await expect(page.getByRole('status').filter({ hasText: '已保存到 DSH' })).toHaveText('已保存到 DSH，从下一次任务生效。');
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('fixture')).value.workerModel))
@@ -58,12 +58,11 @@ test('save, reload, discard and restore defaults', async ({ page }) => {
   await expect(page.getByLabel('模型', { exact: true })).toHaveValue('qwen3-coder');
   expect(errors).toEqual([]);
 });
-test('invalid commands and missing enabled model never cross the wire', async ({ page }) => {
+test('autonomous page has no workflow gates and still requires an enabled model', async ({ page }) => {
   await page.goto('/');
-  await page.getByLabel('验证命令（JSON）').fill('npm test');
-  await page.getByRole('button', { name: '保存配置' }).click();
-  await expect(page.getByRole('alert')).toContainText('JSON');
-  await page.getByLabel('验证命令（JSON）').fill('[["npm", "test"]]');
+  await expect(page.getByLabel('验证命令（JSON）')).toHaveCount(0);
+  await expect(page.getByLabel('强模型调用上限')).toHaveCount(0);
+  await expect(page.getByLabel('规划 Provider')).toHaveCount(0);
   await page.getByLabel('模型', { exact: true }).selectOption('');
   await page.getByRole('button', { name: '保存配置' }).click();
   await expect(page.getByRole('alert')).toContainText('workerModel');
@@ -77,7 +76,7 @@ test('pushed revision preserves draft and refuses stale save until reload', asyn
   await expect(page.getByLabel('模型', { exact: true })).toHaveValue('my-draft');
   await expect(page.getByRole('button', { name: '保存配置' })).toBeDisabled();
   await page.getByRole('button', { name: '载入最新配置' }).click();
-  await expect(page.getByLabel('强模型调用上限')).toHaveValue('5');
+  await expect(page.getByLabel('任务超时（毫秒）')).toHaveValue('5000');
 });
 for (const mode of ['refused', 'failure']) test(`${mode} save retains draft without a false success`, async ({ page }) => {
   await page.goto(`/?${mode}`);

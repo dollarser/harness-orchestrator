@@ -33,10 +33,14 @@ test('workspace lock serializes plugin runs and survives symlink aliases', async
   await assert.rejects(acquireWorkspace(alias, f.state, signal()), /locked/);
   await lease.release(); const second = await acquireWorkspace(alias, f.state, signal()); await second.release();
 });
-test('dirty workspace rejected and lock released on preflight failure', async t => {
+test('existing staged and untracked changes are preserved and captured', async t => {
   const f = await repo(t); await writeFile(join(f.cwd, 'extra'), 'x');
-  await assert.rejects(acquireWorkspace(f.cwd, f.state, signal()), /dirty/);
-  await rm(join(f.cwd, 'extra')); const lease = await acquireWorkspace(f.cwd, f.state, signal()); await lease.release();
+  await writeFile(join(f.cwd, 'tracked.txt'), 'user edit'); f.git('add', 'tracked.txt');
+  const before = f.git('diff', '--cached');
+  const lease = await acquireWorkspace(f.cwd, f.state, signal());
+  const evidence = await lease.evidence(signal());
+  assert.match(evidence.patch, /extra/); assert.match(evidence.patch, /user edit/);
+  assert.equal(f.git('diff', '--cached'), before); await lease.release();
 });
 test('artifacts cannot be stored inside target workspace', async t => {
   const f = await repo(t);
@@ -58,7 +62,7 @@ test('argv is literal, command failures and output limits are evidence', async (
   const overflow = await runCommand([process.execPath, '-e', 'console.log("x".repeat(10000))'], tmpdir(), signal(), 5000, undefined, 100);
   assert.equal(overflow.failure, 'output_limit'); assert.ok(overflow.stdout.length <= 100);
 });
-test('verification timeout and cancellation stop processes', async () => {
+test('host process timeout and cancellation stop processes', async () => {
   const argv = [process.execPath, '-e', 'setInterval(() => {}, 1000)'];
   assert.equal((await runCommand(argv, tmpdir(), signal(), 30)).failure, 'timeout');
   const c = new AbortController(), pending = runCommand(argv, tmpdir(), c.signal, 5000);

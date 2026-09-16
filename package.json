@@ -1,7 +1,7 @@
 {
   "name": "@dollarser/dsh-smart-dev",
-  "version": "0.3.1",
-  "description": "Deterministic coding orchestration as a DeepSeek Harness plugin",
+  "version": "0.4.0",
+  "description": "Agent-owned coding tasks with runtime safeguards as a DeepSeek Harness plugin",
   "type": "module",
   "license": "MIT",
   "repository": "github:dollarser/harness-orchestrator",
@@ -34,7 +34,7 @@
     "docs/configuration-page.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/build-client.mjs",
+    "build": "node scripts/clean-build.mjs && tsc -p tsconfig.json && node scripts/build-client.mjs",
     "test": "npm run build && node --test tests/*.test.mjs",
     "check": "npm test && node scripts/check-docs.mjs",
     "prepack": "npm run build",

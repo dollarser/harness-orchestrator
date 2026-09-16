@@ -1,91 +1,67 @@
-# 当前架构
+# 架构：Agent 决策，插件管理运行
 
-```mermaid
-flowchart TD
-    U[用户 /smart-dev] --> P[DSH command 插件]
-    P --> M[父 Agent maintenance]
-    M --> C[独立编排核心]
-    C --> B[DSH subagent 适配]
-    B --> S[Codex 规划 / 审查]
-    B --> W[DSH 本地实现 / 修复]
-    C --> V[验证进程]
-    C --> A[仓库外产物与状态]
-```
+## 职责
 
-## 分层
+`/smart-dev` 是 DSH 的原生命令。父会话通过 `runMaintenance` 暂停并发工作，插件在其工作区启动一个配置好的 DSH 子 Agent。Agent 自行决定如何规划、实现、检查、修复与审查；不解析计划或审查 JSON，不强制调用其他角色。
 
-`src/core` 只通过 `Ports` 使用 `invoke`、`verify`、`evidence`、`save`、`progress`。`src/dsh` 连接命令和子 Agent，`src/host` 实现本地副作用。未来可以复用策略语义、产物协议与测试；跨语言迁移仍需移植实现。
+| Agent 决策 | 插件运行保障 |
+|---|---|
+| 是否需要计划、测试、构建、额外审查 | 配置快照、工作区并发锁 |
+| 选择检查命令、发现问题后如何修复 | 超时、取消、等待子 Agent 清理 |
+| 何时停止、如何报告完成或阻塞 | 原子运行记录、Git 快照、原样呈现报告 |
 
-`/smart-dev` 是人类命令，不依赖模型生成 workflow 脚本。命令在父 Agent 的 `runMaintenance()` 中执行，已有活跃任务会拒绝占用，后续输入留在 inbox。其他会话或外部工具仍可能修改同一仓库，因此应使用独立 worktree。
+`src/core` 仅通过 `invoke`、`save`、`progress` 管理一次执行。`src/dsh` 适配 DSH 服务，`src/host` 管理本机副作用。插件没有单独执行验证命令的入口；检查沿用 Agent 的 DSH 工具权限。
 
-## 配置与 Web 扩展
-
-Host 依赖 `commands`、`subagents`、`settings`。`src/dsh/settings.ts` 注册 `smart-dev` namespace，以 overlay 为 base，复用 DSH 的 schema 校验、持久化和 revision 检查。原有完整 JSON 配置保持兼容；空配置允许插件加载并在页面完成设置，默认禁用。
-
-浏览器产物通过 `package.json` 的 `dsh.client` / `./client` 声明发布，以 DSH 要求的 lazy factory 加载。`src/client` 使用 `ctx.settingsScope` 和 `settings.section` 插槽，注册独立 Smart Dev 设置栏目；不新增 HTTP API、鉴权逻辑或前端服务。
-
-共享的纯配置校验放在 `src/shared`，浏览器不会导入 Node 文件系统模块。宿主是校验权威，页面检查只用于尽早反馈。页面保留草稿及读取时的 revision，拒绝无提示覆盖；收到保存响应后核对服务镜像才显示成功。状态目录只读，其值受 schema 常量约束。
-
-命令进入 maintenance 后读取当前设置并复制为本次运行的快照，产物 `config.json` 记录实际使用值；运行中的模型、预算和验证命令不随设置更新变化。设置范围和重置语义见 [配置页说明](configuration-page.md)。
-
-## 状态与预算
+## 生命周期
 
 ```text
-PLAN → EXECUTE → VERIFY → REVIEW → DONE
-                   ↑        │
-                   └─ FIX ←─┘
-VERIFY → NEEDS_REVIEW（没有审查预算）
-异常 → FAILED；取消 → CANCELLED
+CREATED → RUNNING → FINISHED
+              ├→ FAILED
+              └→ CANCELLED
 ```
 
-- `maxStrongCalls` 计量 Planner/Reviewer 启动尝试，与 provider 注册别名无关。启动前落盘；失败尝试也计数。
-- 默认 2 次：Plan + Review。修复后再次验证并返回 `NEEDS_REVIEW`，不会默认通过。
-- 3 次允许一次修复后复核；更多修复需要相应增加预算。`maxFixRounds` 默认 1，0 禁止修复。
-- `DONE` 要求非空验证集全部退出码为 0、没有超时/取消/截断标记，且最新审查为无未解决 issues 的 `PASS`。
-- 产物在本地严格校验。外部 provider 不一定支持结构化输出，因此不强传 `outputSchema`。
+- FINISHED：子 Agent 以 completed 返回非空文本。报告可包含“未完成”或“阻塞”；插件不会据此伪造 PASS。
+- FAILED：启动、执行或记录异常，或返回截断/异常/空结果。不会自动重试。
+- CANCELLED：用户取消或插件卸载引发取消。已产生改动保留。
+- 超时中断子 Agent，报告 FAILED 和超时原因。
 
-`NEEDS_REVIEW` 表示最新改动没有获得审查，最新测试也可能仍失败；必须看验证证据。当前没有续跑命令，不能在脏目录重新执行全流程来代替恢复。
+这是一组进程生命周期状态，不是任务策略阶段。旧 `DONE` / `NEEDS_REVIEW` 及两次强模型预算规则不再适用。
 
-## 子 Agent 生命周期
+## 子 Agent
 
-适配器调用 `ctx.subagents.start(provider, {parent, prompt, signal, ...})`，读取 `run.result`，始终等待 `run.dispose()`。非 `completed` 结果不能作为成功。启动期间的取消由 provider 负责回收未发布资源。
+默认 backend 为 spawn，只要求支持模型选择；只有用户配置了工具过滤时才要求 toolFilter 能力。空工具列表意味着不额外过滤，使用 DSH 暴露给该 Agent 的工具与权限。
 
-Worker 固定显式模型、工具 allowlist 和绝对委派深度上限 1；backend 必须声明对应能力。目前支持的路径为 `spawn`；不能只改名称就声称 Claude Code Worker 支持相同限制。
+插件不再强制 maxDepth=1，不禁止调用其他 Agent。能否委派、使用哪些工具，仍受宿主的工具配置、委派能力和深度限制约束。旧版本已保存的工具列表不会自动扩大。
 
-取消、超时、插件卸载向子 Agent 传递信号。卸载先撤销命令，再等待在途操作清理。若 child disposal 抛错，保留锁供人工检查。若 provider 不响应启动取消或永不完成 disposal，插件可能等待；不会在已知子任务未清理时继续派遣写者。
+每次启动传入父 Agent、任务文本、所选模型和取消信号。读取 `run.result` 后必须等待 `run.dispose()`；清理失败保留工作区锁，避免在子任务可能仍写入时启动另一个任务。启动阶段的取消清理由 backend 契约负责。
 
-## Workspace 与 Git
+## 工作区和记录
 
-目标须为有 HEAD 的干净 Git worktree 根目录；包含未跟踪文件的脏状态也拒绝。规范化真实路径后，以路径 SHA-256 在 `stateRoot/locks` 建立原子目录锁。多个实例必须共享同一 stateRoot。
+- 当前支持 macOS/Linux、有 HEAD 的 Git worktree 根目录。
+- 允许脏工作区，不自动 stage、stash、commit、reset；提示 Agent 保留已有工作。
+- `stateRoot` 必须解析到仓库外；符号链接通过真实路径规整。
+- 同一 workspace、同一 stateRoot 下的本插件任务通过目录锁串行化；其他程序不受此锁约束。
+- 开始前保存 `before.patch`；结束或失败后尽力保存 `last.patch`，快照失败写入 `snapshot.error.txt`。
+- 快照使用临时 Git index，不修改用户暂存区。两份 patch 各自相对于采集时 HEAD，可能包含先前改动；若 Agent 按用户请求提交了代码，需结合 Git 历史，不能把 last.patch 当作任务全部改动。
+- 不自动回滚；崩溃遗留锁需要核对 owner.json、进程和子任务后人工处理。
 
-证据采集使用临时 index：读入 HEAD，加入非忽略文件，生成 binary patch，包含新增文件，不改用户 staging。指纹包括 HEAD、分支、status、真实 staging diff 和工作树 patch，用于检测 Planner/Reviewer 的可见修改。
-
-这是事后检测，不覆盖忽略文件、仓库外写入、写后恢复及所有 Git 管理状态。Submodule 内部改动也不等于完整可移植补丁。失败保留改动，不自动回滚。
-
-## 验证进程
-
-命令来自受信任宿主配置，以 argv 运行，无 shell 展开。它们是宿主进程，**不经过 DSH 工具权限审批**；不能把模型生成内容直接放入验证配置。POSIX 取消终止进程组，主动脱离进程组的后台进程不在保证范围内。默认单条验证输出最多 2 MB，超限即失败。
-
-## 产物与恢复
-
-默认 `${XDG_STATE_HOME:-~/.local/state}/harness-orchestrator/runs/<uuid>/`：
+记录目录：
 
 ```text
-config.json / policy.json / task.txt
-state.json                      最新阶段与预算
-event-*.json                    阶段变化
-*-planner.prompt.txt / *.result.json / *.error.txt
-plan.json
-verification-<round>.json
-changes-<round>.patch
-review-<round>.json
-final.patch                     仅 DONE
-last.patch                      正常清理后的最终改动，包括失败/取消
-error.txt / snapshot.error.txt
+config.json / task.txt
+before.patch / last.patch
+agent.prompt.txt / agent.result.json
+report.md                     正常返回的原始报告
+state.json / event-<n>.json
+error.txt / snapshot.error.txt 按需生成
 ```
 
-文本与 JSON 通过临时文件加 rename 写入，新目录权限 0700、文件 0600。原子替换不等于跨文件事务或断电级 fsync 保证。进程崩溃可能留下非终态和锁；不会自动恢复/重放。
+未聚合子 Agent 的全部工具遥测、token 或费用。运行记录不构成独立验证证明。
 
-计划需有 summary、risk、非空且 ID 唯一的 tasks，每项含 description 和非空 acceptance。审查需 decision、summary、issues；issue 含 severity、problem。额外字段用于文件位置、建议等。单个结构化产物最多 256000 字符，审查 patch 最多 120000 字符；超限明确失败，保留证据。
+## 配置
 
-记录是编排轨迹，不是完整后端 trace。没有 token/cost 归一化，预算只覆盖插件直接启动的强模型角色。
+配置仅包含执行 Agent 的 backend、模型、可选工具范围、超时和产物目录。旧流程字段已删除，不提供迁移或兼容逻辑；已有配置需要移除旧字段。插件拒绝未知字段，避免误以为配置仍在生效。
+
+配置变更只影响下次执行，stateRoot 仍只能通过部署修改，以免运行中更换锁目录。恢复默认值重置当前页面字段。
+
+设计决策见 [ADR-002](decisions/002-agent-owned-execution.md)。
