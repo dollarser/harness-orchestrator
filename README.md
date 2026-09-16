@@ -30,14 +30,14 @@ npm ci
 npm pack
 ```
 
-这会自动构建并生成 `dollarser-dsh-smart-dev-0.10.1.tgz`。记下该文件的完整路径，例如 `/Users/你的用户名/harness-orchestrator/dollarser-dsh-smart-dev-0.10.1.tgz`。
+这会自动构建并生成 `dollarser-dsh-smart-dev-0.11.0.tgz`。记下该文件的完整路径，例如 `/Users/你的用户名/harness-orchestrator/dollarser-dsh-smart-dev-0.11.0.tgz`。
 
 ### 2. 安装到 DSH
 
 进入你平时运行 `pnpm dsh web` 的 DSH 源码目录，执行以下命令，将路径替换为上一步生成的文件：
 
 ```sh
-pnpm dsh plugin --profile web add /完整路径/dollarser-dsh-smart-dev-0.10.1.tgz
+pnpm dsh plugin --profile web add /完整路径/dollarser-dsh-smart-dev-0.11.0.tgz
 ```
 
 安装命令会自动登记插件自带的启动配置，无需编辑 YAML 或填写插件入口路径。如果你使用其他 Profile，请将命令中的 `web` 改为对应名称。
@@ -90,6 +90,8 @@ claude auth login
 在 Smart Dev 中选择预设，打开“注入分工指引”，编辑“指引内容”并点击“保存指引”。例如：
 
 > 复杂任务优先考虑让 Codex 分析方案，让 Claude Code 执行。简单修改直接完成。根据实际改动决定是否需要测试和审查。
+
+默认指引优先让 Codex 处理关键规划、难题诊断和重要审查，让 Claude Code、DSH 子 Agent 或主 Agent 承担执行；可根据实际结果调整分工，不强制流水线。完整内容见[默认分工指引](examples/delegation-guidance.md)。
 
 每个预设独立保存。可以“恢复默认指引”，也可以关闭注入。**修改指引无需重启**，下次组装提示词时生效；保存文字不会自动打开注入开关。
 
