@@ -60,10 +60,15 @@ test('browser artifact registers a lazy DSH factory and contributes the native s
   let entry, registered, bound;
   runInNewContext(await readFile(new URL('../dist/client.js', import.meta.url), 'utf8'), { window: { __ModuleLoader__: { load(value) { entry = value; } } } });
   assert.equal(entry.id, pkg.name);
-  assert.deepEqual(pkg.dsh.client.inject, ['@deepseek-ai/dsh-client-ui-settings']);
+  assert.deepEqual(pkg.dsh.client.inject, ['@deepseek-ai/dsh-client-ui-settings', '@deepseek-ai/dsh-api-remotes']);
   const client = entry.factory(name => { assert.equal(name, 'react'); return React; });
-  client.apply({ settingsScope: { bind(spec) { bound = spec; return {}; } }, slots: {
+  assert.deepEqual(Array.from(client.inject), ['slots', 'settingsScope', 'remote', 'remote.session']);
+  let catalogResponse = { ok: true, value: { groups: [] } };
+  client.apply({ remote: { session: { modelCatalog: async () => catalogResponse } }, settingsScope: { bind(spec) { bound = spec; return {}; } }, slots: {
     inject(name, work) { assert.equal(name, 'settings.section'); work(); }, register(options, component) { registered = options; assert.equal(typeof component, 'function'); },
   } });
   assert.equal(bound.namespace, 'smart-dev'); assert.equal(registered.id, 'smart-dev');
+  assert.equal(await registered.inject().loadCatalog(), catalogResponse.value);
+  catalogResponse = { ok: false, error: { message: 'Catalog unavailable' } };
+  await assert.rejects(registered.inject().loadCatalog(), /Catalog unavailable/);
 });

@@ -15,7 +15,15 @@
 - 验证命令，使用 JSON 二维 argv 数组，不解析 shell 命令行。
 - Agent 和验证命令超时，单位毫秒。
 
-Provider 和模型 ID 手动填写；页面不会自动安装 backend、创建模型连接或探测真实调用能力。API Key 不属于此页，继续由 DSH Models / credentials 管理。
+“模型 Provider”和“模型”使用联动下拉框，读取 DSH 的 `session.modelCatalog()`，与 DSH 会话模型选择器使用同一目录。切换 Provider 后需重新选择模型；可点击“刷新模型列表”更新目录。目录中未列出的旧配置会保留并提示，不会自动改写。加载失败提供重试，空目录引导到 Settings → Models；某个 Provider 加载失败不妨碍选择其他正常 Provider。
+
+Planner / Reviewer Provider 和 Worker backend 仍填写子代理后端名称。页面不会自动安装 backend、创建模型连接或验证真实调用能力。API Key 不属于此页，继续由 DSH Models / credentials 管理。
+
+### 验证命令的作用
+
+Worker 修改代码后，宿主按顺序在任务工作区执行验证命令，并把输出和退出码交给 Reviewer。验证或审查失败时，在预算允许范围内修复并重新验证；只有全部验证成功、审查通过且没有问题，任务才能标记 DONE。命令由用户按项目选择，启用工作流前至少配置一条。
+
+例如 Node 项目可以使用 `[["npm", "test"]]`；本 `harness-orchestrator` 项目使用 `[["npm", "run", "check"]]`，执行构建、测试和文档检查。每个内层数组是一条命令及其参数，不展开 shell（不能把 `npm test && npm run build` 当作一个参数）。当前配置按宿主共享，切换项目后需核对命令。
 
 ## 保存与覆盖
 

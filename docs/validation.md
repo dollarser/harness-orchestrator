@@ -12,7 +12,7 @@
 
 `npm run check` 执行 TypeScript 编译、Node 测试和本地 Markdown 链接检查。
 
-本次 macOS / Node.js 25.9.0 本地检查结果：干净 `npm ci` 成功；33 项 Node 测试通过；7 项 Playwright 浏览器交互测试通过；本地文档链接检查、`npm pack --dry-run` 和 overlay 生成检查通过。归档 Python 原型在前一次重构中通过的 3 项测试未在本次 UI 变更重复执行。没有把这些本地结果写成远端 CI 或真实模型验收结果。
+0.3.1 在 macOS / Node.js 25.9.0 的本地检查：33 项 Node 测试、11 项 Playwright 浏览器交互测试、本地文档链接检查和 `npm pack` 通过。0.3.0 的干净 `npm ci` 和 overlay 生成检查已通过；归档 Python 原型在前一次重构中通过的 3 项测试未在本次 UI 变更重复执行。没有把这些本地结果写成远端 CI 或真实模型验收结果。
 
 覆盖范围：
 
@@ -25,11 +25,18 @@
 - 真实宿主进程的 argv、启动失败、输出限制、超时和取消。
 - 首次空配置、启用校验、设置持久化前拒绝非法值、原生 revision 冲突、继承重置、不可在线更改状态目录。
 - Browser lazy factory 和原生 slot 注册；页面保存/刷新/放弃/重置、无效输入、并发更新、静默拒绝与网络错误、只读/未就绪状态、桌面和窄屏深色布局。
+- 原生 `session.modelCatalog()` 结果和错误传递、Provider/模型联动选择、切换 Provider 清空旧模型、保留目录外的历史配置、刷新重试、空目录与部分 Provider 失败。
 - 真实 Cordis 加载插件、命令注册/撤销；假 DSH provider + 真实 Git 的完整状态机，运行中保存配置不会改变该任务，而下一任务读取新值；以及卸载时在途 child 取消与锁释放。
 
 GitHub Actions 配置 macOS/Linux × Node 22/24 的 Node 检查和独立 Ubuntu Chromium 交互检查；远端 CI 是否通过应以对应提交的运行结果为准。
 
 ## 真实 DSH Web 页面冒烟
+
+### 0.3.1 模型目录
+
+在同一上游 HEAD 的本机 DSH Web profile 更新安装 0.3.1 后，真实页面确认“模型 Provider”和“模型”下拉框、目录外旧配置提示；选择实际注册的 Provider 后旧模型清空，随后可选其已配置模型。测试结束放弃草稿，保留个人配置。宿主要求同时声明 `remote` 和 `remote.session` 注入，已通过此真实页面验证并补入构建产物检查。此次没有发起模型调用。
+
+### 0.3.0 设置持久化
 
 使用本机 DSH 源码版本 `0.1.6-alpha.1-213cd1a-dirty`（HEAD `213cd1aa23b75a9597dfff50c0a9c75bedd87d69`，包含本地修改），另起隔离的 `DSH_HOME` 和端口，加载本插件构建后的 overlay。没有改动用户原来运行的 DSH 实例或个人模型配置。
 

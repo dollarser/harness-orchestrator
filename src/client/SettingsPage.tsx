@@ -4,9 +4,11 @@ import type { Settings } from '../shared/config.js';
 import { editableKeys, fromDraft, same, toDraft } from './editor.js';
 import type { Draft } from './editor.js';
 import { styles } from './styles.js';
+import { ModelFields } from './ModelFields.js';
+import type { LoadModelCatalog } from './ModelFields.js';
 
-type Props = { scope: SettingsScope<Settings> };
-export function SettingsPage({ scope }: Props) {
+type Props = { scope: SettingsScope<Settings>; loadCatalog: LoadModelCatalog };
+export function SettingsPage({ scope, loadCatalog }: Props) {
   const fieldPrefix = React.useId();
   const snapshot = React.useSyncExternalStore(cb => scope.subscribe(cb), () => scope.getSnapshot());
   const [base, setBase] = React.useState(snapshot);
@@ -68,11 +70,14 @@ export function SettingsPage({ scope }: Props) {
       <fieldset disabled={!writable || busy} className="sd-fields">
         <label className="sd-enable"><span><strong>启用工作流</strong><small>保存后用于新任务；正在运行的任务继续使用原配置。</small></span>
           <input type="checkbox" role="switch" checked={draft.enabled} onChange={e => edit('enabled', e.target.checked)} /></label>
-        <section className="sd-card"><h3>模型与执行</h3><p>填写 DSH 中已注册的 ID。模型连接与凭据在 Settings → Models 管理。</p>
+        <section className="sd-card"><h3>模型与执行</h3><p>从 DSH 模型目录选择执行模型。模型连接与凭据在 Settings → Models 管理。</p>
           <div className="sd-grid">{textField('plannerProvider', '规划 Provider')}{textField('reviewerProvider', '审查 Provider')}
             {textField('workerProvider', '执行 Backend', '默认 spawn；需要支持模型覆盖、工具过滤和深度限制。')}
-            {textField('modelProvider', '模型 Provider ID', '例如本地模型对应的 DSH provider ID。')}
-            <div className="sd-full">{textField('model', '模型 ID', '填写已配置模型的准确 ID。')}</div></div>
+            <ModelFields provider={draft.modelProvider} model={draft.model} loadCatalog={loadCatalog}
+              onChange={(modelProvider, model) => {
+                setDraft(current => current ? { ...current, modelProvider, model } : current);
+                setDirty(true); setNotice(undefined);
+              }} /></div>
           <label className="sd-field">工具白名单<textarea rows={3} value={draft.tools} spellCheck={false} onChange={e => edit('tools', e.target.value)} /><small>每行一个精确工具名，例如 bash。</small></label>
         </section>
         <section className="sd-card"><h3>调用预算</h3><div className="sd-grid">
@@ -80,9 +85,9 @@ export function SettingsPage({ scope }: Props) {
           {textField('maxFixRounds', '修复轮次上限', '修复后会重新运行验证。', { min: 0, max: 10 })}</div>
           <p className="sd-note">预算为 2 次时，修复后可能停在 NEEDS_REVIEW。需要再次审查时，至少设置为 3。</p>
         </section>
-        <section className="sd-card"><h3>验收与超时</h3><label className="sd-field">验证命令（JSON）
+        <section className="sd-card"><h3>验收与超时</h3><p>Worker 修改代码后，自动运行这些测试或构建命令，并将结果交给审查。验证或审查未通过时，会在预算允许范围内修复并重新验证。全部检查通过且审查通过，任务才算完成。启用工作流前至少配置一条。</p><label className="sd-field">验证命令（JSON）
           <textarea className="sd-code" rows={6} value={draft.commands} spellCheck={false} onChange={e => edit('commands', e.target.value)} />
-          <small>例如 [["npm", "test"], ["npm", "run", "lint"]]。每个数组是一条命令，参数分开填写；在任务的工作区执行，不展开 shell。</small></label>
+          <small>例如 [["npm", "test"]]；本插件项目可用 [["npm", "run", "check"]]。每个数组是一条命令，参数分开填写；按顺序在任务工作区执行，不展开 shell。切换项目时请换成该项目的检查命令。</small></label>
           <div className="sd-grid">{textField('agentTimeoutMs', '单个 Agent 超时（毫秒）', undefined, { min: 1, max: 2_147_483_647 })}
           {textField('commandTimeoutMs', '单条验证超时（毫秒）', undefined, { min: 1, max: 2_147_483_647 })}</div>
         </section>

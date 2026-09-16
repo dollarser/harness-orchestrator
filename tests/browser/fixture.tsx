@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { SettingsPage } from '../../src/client/SettingsPage.js';
 import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client';
 import type { Settings } from '../../src/shared/config.js';
+import type { ModelCatalog } from '@deepseek-ai/dsh-api-remotes/client';
 
 const initial: Settings = { enabled: true, plannerProvider: 'codex', reviewerProvider: 'codex', workerProvider: 'spawn',
   workerModel: { provider: 'local', model: 'qwen3-coder' }, workerToolAllow: ['bash'], verifyCommands: [['npm', 'test']],
@@ -13,6 +14,26 @@ let snapshot: SettingsScopeSnapshot<Settings> = { status: 'ready', value: struct
 if (params.has('readonly')) snapshot.writable = false;
 if (params.has('unavailable')) snapshot = { ...snapshot, status: 'unavailable', value: undefined, mode: 'memory' };
 if (params.has('loading')) snapshot = { ...snapshot, status: 'loading', value: undefined };
+if (params.has('unknown')) {
+  const workerModel = { provider: 'removed', model: 'old-model' };
+  snapshot.value = { ...initial, workerModel }; snapshot.user = { workerModel };
+}
+const catalog: ModelCatalog = {
+  default: { provider: 'local', model: 'qwen3-coder' }, routableProviders: ['local', 'remote'], failures: [],
+  groups: [
+    { id: 'local', name: 'Local Models', models: ['qwen3-coder', 'new-model', 'unsaved', 'my-draft'].map(id => ({ id, name: id })) },
+    { id: 'remote', name: 'Remote Models', models: [{ id: 'remote-model', name: 'Remote Coder' }] },
+  ],
+};
+let catalogReads = 0;
+async function loadCatalog(): Promise<ModelCatalog> {
+  catalogReads++;
+  if (params.has('catalog-failure') && catalogReads === 1) throw new Error('Fixture: catalog unavailable');
+  if (params.has('empty-catalog')) return { ...catalog, groups: [], routableProviders: [] };
+  if (params.has('partial-catalog')) return { ...catalog, groups: catalog.groups.slice(0, 1),
+    failures: [{ id: 'remote', name: 'Remote Models', message: 'Model directory unavailable' }] };
+  return catalog;
+}
 const listeners = new Set<() => void>();
 function publish(next: typeof snapshot) { snapshot = next; listeners.forEach(listener => listener()); }
 let writes = 0;
@@ -30,4 +51,4 @@ const scope: SettingsScope<Settings> = {
   set: async () => { throw new Error('Use atomic mutation'); }, unset: async () => { throw new Error('Use atomic mutation'); },
 };
 Object.assign(window, { fixture: { remoteChange() { publish({ ...snapshot, value: { ...snapshot.value!, maxStrongCalls: 5 }, revision: snapshot.revision! + 1 }); }, writes: () => writes } });
-createRoot(document.getElementById('root')!).render(<SettingsPage scope={scope} />);
+createRoot(document.getElementById('root')!).render(<SettingsPage scope={scope} loadCatalog={loadCatalog} />);

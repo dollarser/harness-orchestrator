@@ -51,13 +51,13 @@ pnpm dsh web --patch "$HOME/.config/smart-dev.patch.yml"
 
 打开 **Settings → Smart Dev**：
 
-1. 在「模型与执行」填写 DSH 已配置模型的 provider ID、model ID 和精确工具名。
+1. 在「模型与执行」依次选择「模型 Provider」和「模型」，并填写精确工具名。列表来自 DSH；新增模型后点击「刷新模型列表」。
 2. 填写目标项目的验证命令，例如 `[["npm", "test"], ["npm", "run", "lint"]]`。
 3. 按需调整预算和超时，打开「启用工作流」，点击「保存配置」。
 
 首次安装默认禁用，可以保存尚未完成的配置；启用时宿主必须校验通过。配置存入 DSH settings 服务；默认文件 provider 写入 `$DSH_HOME/settings.yaml` 的 `smart-dev` 节。保存后的修改用于下一次任务，正在运行的任务继续使用自己的配置快照。模型凭据仍在 DSH 管理，页面不保存 API Key。
 
-页面支持放弃修改、恢复部署默认值和并发修改提示。模型和 provider ID 为手动输入，页面不证明它们已安装或可调用；执行前仍由 provider 能力检查把关。更多说明见 [配置页](configuration-page.md)。
+页面支持放弃修改、恢复部署默认值和并发修改提示。模型从 DSH 目录选择；未列出的旧配置会保留并提示。目录列出模型不代表真实调用已验证；执行前仍由 provider 能力检查把关。更多说明见 [配置页](configuration-page.md)。
 
 ### 从文件预配置（兼容原入口）
 
